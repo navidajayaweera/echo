@@ -1,5 +1,7 @@
 // Mirrors supabase/functions/_shared/providers/types.ts — keep in sync.
 
+import type { PersonaTraits } from '@/lib/types/database';
+
 export type AIProviderName = 'beyond_presence' | 'openai' | 'gemini';
 
 export const AI_PROVIDER_LABELS: Record<AIProviderName, string> = {
@@ -16,7 +18,7 @@ export interface ChatMessage {
 export interface StartSessionRequest {
   provider: AIProviderName;
   messages?: ChatMessage[];
-  persona_overrides?: Record<string, number>;
+  persona_overrides?: Partial<PersonaTraits>;
   context?: string;
 }
 

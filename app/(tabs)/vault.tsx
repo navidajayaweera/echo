@@ -13,7 +13,7 @@ import { JournalComposer } from '@/components/journal/JournalComposer';
 import { JournalEntryCard } from '@/components/journal/JournalEntryCard';
 import { JournalSearchBar } from '@/components/journal/JournalSearchBar';
 import { TimelineItemCard } from '@/components/timeline/TimelineItemCard';
-import { MediaUploadPicker } from '@/components/timeline/MediaUploadPicker';
+import { MediaUploadWizard } from '@/components/timeline/MediaUploadWizard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { EchoColors, EchoFonts } from '@/constants/echo-theme';
 import { useAppInsets } from '@/hooks/use-app-insets';
@@ -39,7 +39,7 @@ export default function VaultScreen() {
   const [search, setSearch] = useState('');
   const { entries, refresh, addEntry } = useJournalCache();
   const { isSyncing, lastSyncAt, syncError, runSync } = useJournalSyncContext();
-  const { sections, isLoading, isUploading, error, pickAndUpload, deleteMedia } = useTimeline();
+  const { sections, isLoading, isUploading, error, uploadMedia, deleteMedia } = useTimeline();
   const { contentBottom, fabBottom, horizontal, right } = useAppInsets({ includeTabBar: true });
 
   useFocusEffect(
@@ -117,7 +117,7 @@ export default function VaultScreen() {
               <TimelineItemCard item={item} onDelete={deleteMedia} />
             )}
             ListFooterComponent={
-              <MediaUploadPicker isUploading={isUploading} onUpload={pickAndUpload} />
+              <MediaUploadWizard isUploading={isUploading} onUpload={uploadMedia} />
             }
             ListEmptyComponent={
               !isLoading ? (
