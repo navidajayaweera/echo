@@ -1,0 +1,46 @@
+# supabase/config.toml — local development configuration
+# Run: npx supabase start
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+# 50 MB
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+# Local site URL for OAuth redirects
+site_url = "exp://localhost:8081"
+additional_redirect_urls = ["exp://localhost:8081", "echo://"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = false
+enable_confirmations = false
+
+[functions.start-ai-session]
+verify_jwt = true
+
+[functions.embed-journal]
+verify_jwt = true

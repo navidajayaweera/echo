@@ -10,9 +10,11 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { PERSONA_TRAIT_LABELS } from '@/constants/persona';
 import { EchoColors } from '@/constants/echo-theme';
 import { DEFAULT_PERSONA_TRAITS, type PersonaTraits } from '@/lib/types/database';
+import { AI_PROVIDER_LABELS } from '@/lib/types/ai-session';
 import { useAppInsets } from '@/hooks/use-app-insets';
 import { useJournalSyncContext } from '@/providers/JournalSyncProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { useSessionStore } from '@/stores/session.store';
 
 export default function SettingsScreen() {
   const {
@@ -24,6 +26,7 @@ export default function SettingsScreen() {
     signOut,
   } = useAuth();
   const { isSyncing, lastSyncAt, syncError } = useJournalSyncContext();
+  const { connectionStatus, provider: activeProvider } = useSessionStore();
   const { contentBottom } = useAppInsets({ includeTabBar: true });
 
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
@@ -85,11 +88,20 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const aiStatusMap: Record<string, 'ok' | 'pending' | 'warn'> = {
+    idle: 'pending',
+    connecting: 'pending',
+    connected: 'ok',
+    reconnecting: 'pending',
+    disconnected: 'warn',
+    error: 'warn',
+  };
+
   const checklist = [
     {
       label: 'Supabase',
       status: isConfigured ? ('ok' as const) : ('warn' as const),
-      detail: isConfigured ? 'Connected' : 'Missing .env',
+      detail: isConfigured ? 'Connected' : 'Missing .env keys',
     },
     {
       label: 'Journal sync',
@@ -97,14 +109,13 @@ export default function SettingsScreen() {
       detail: syncError ?? (lastSyncAt ? `OK · ${new Date(lastSyncAt).toLocaleTimeString()}` : 'Ready'),
     },
     {
-      label: 'Beyond Presence',
-      status: 'pending' as const,
-      detail: 'Next sprint',
-    },
-    {
-      label: 'LiveKit',
-      status: 'pending' as const,
-      detail: 'Next sprint',
+      label: 'AI Session',
+      status: (aiStatusMap[connectionStatus] ?? 'pending') as 'ok' | 'pending' | 'warn',
+      detail: connectionStatus === 'connected' && activeProvider
+        ? `${AI_PROVIDER_LABELS[activeProvider]} · active`
+        : connectionStatus === 'idle'
+          ? 'Not started'
+          : connectionStatus,
     },
   ];
 

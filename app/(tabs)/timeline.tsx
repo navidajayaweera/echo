@@ -1,51 +1,55 @@
 import { SectionList, StyleSheet, Text, View } from 'react-native';
 
+import { MediaUploadPicker } from '@/components/timeline/MediaUploadPicker';
+import { TimelineItemCard } from '@/components/timeline/TimelineItemCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { EchoColors, EchoFonts } from '@/constants/echo-theme';
 import { useAppInsets } from '@/hooks/use-app-insets';
-
-type TimelineItem = { id: string; title: string; type: 'letter' | 'photo' };
-
-const PLACEHOLDER_SECTIONS: { title: string; data: TimelineItem[] }[] = [
-  {
-    title: '1985',
-    data: [{ id: '1', title: 'Summer letters', type: 'letter' }],
-  },
-  {
-    title: '1974',
-    data: [{ id: '2', title: 'Kitchen photo', type: 'photo' }],
-  },
-];
+import { useTimeline } from '@/hooks/useTimeline';
+import type { MediaVaultRow } from '@/lib/types/media-vault';
 
 export default function TimelineScreen() {
   const { contentBottom } = useAppInsets({ includeTabBar: true });
+  const { sections, isLoading, isUploading, error, pickAndUpload, deleteMedia } = useTimeline();
 
   return (
     <ScreenContainer includeTabBarPadding>
-      <SectionHeader
-        title="Memory vault"
-        subtitle="Upload photos & legacy media — full Storage sync coming soon"
-      />
       <SectionList
-        sections={PLACEHOLDER_SECTIONS}
+        sections={sections}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: contentBottom }}
         showsVerticalScrollIndicator={false}
-        renderSectionHeader={({ section: { title } }) => (
-          <Text style={styles.year}>{title}</Text>
+        ListHeaderComponent={
+          <SectionHeader
+            title="Memory vault"
+            subtitle={
+              isLoading
+                ? 'Loading…'
+                : error
+                  ? error
+                  : sections.length === 0
+                    ? 'Upload your first memory below'
+                    : `${sections.reduce((n, s) => n + s.data.length, 0)} items across ${sections.length} year${sections.length !== 1 ? 's' : ''}`
+            }
+          />
+        }
+        renderSectionHeader={({ section: { year } }) => (
+          <Text style={styles.yearLabel}>{year}</Text>
         )}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            <Text style={styles.itemType}>{item.type}</Text>
-            <Text style={styles.itemTitle}>{item.title}</Text>
-            <Text style={styles.preview}>Preview · demo data</Text>
-          </View>
+        renderItem={({ item }: { item: MediaVaultRow }) => (
+          <TimelineItemCard item={item} onDelete={deleteMedia} />
         )}
+        stickySectionHeadersEnabled={false}
         ListFooterComponent={
-          <View style={styles.uploadHint}>
-            <Text style={styles.uploadText}>+ Upload media to Supabase Storage</Text>
-          </View>
+          <MediaUploadPicker isUploading={isUploading} onUpload={pickAndUpload} />
+        }
+        ListEmptyComponent={
+          !isLoading ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>No memories yet — add photos, letters, and more.</Text>
+            </View>
+          ) : null
         }
       />
     </ScreenContainer>
@@ -53,51 +57,23 @@ export default function TimelineScreen() {
 }
 
 const styles = StyleSheet.create({
-  year: {
+  yearLabel: {
     fontFamily: EchoFonts.serif,
     fontSize: 32,
     fontWeight: '300',
     color: EchoColors.text,
     marginTop: 24,
-    marginBottom: 12,
-  },
-  item: {
-    backgroundColor: EchoColors.bgElevated,
-    borderRadius: 12,
-    padding: 16,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: EchoColors.border,
   },
-  itemType: {
-    color: EchoColors.accentWarm,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  itemTitle: {
-    color: EchoColors.text,
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  preview: {
-    color: EchoColors.textDim,
-    fontSize: 13,
-    marginTop: 6,
-  },
-  uploadHint: {
-    marginTop: 24,
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: EchoColors.border,
-    borderStyle: 'dashed',
+  emptyBox: {
+    paddingTop: 32,
     alignItems: 'center',
   },
-  uploadText: {
+  emptyText: {
     color: EchoColors.textMuted,
     fontSize: 15,
     textAlign: 'center',
+    maxWidth: 280,
+    lineHeight: 22,
   },
 });
