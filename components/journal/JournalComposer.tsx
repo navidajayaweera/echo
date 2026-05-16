@@ -1,4 +1,3 @@
-import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useState } from 'react';
 import {
@@ -18,6 +17,11 @@ import { MediaAttachmentStrip, type AttachedMedia } from '@/components/journal/M
 import { MoodPicker, type MoodKey } from '@/components/journal/MoodPicker';
 import { EchoColors, EchoFonts } from '@/constants/echo-theme';
 import { feedMemoryToAvatar } from '@/lib/avatar-feed';
+import {
+  normalizeVaultMimeType,
+  readLocalFileAsBytes,
+  toStorageUploadBody,
+} from '@/lib/read-local-file';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -103,18 +107,15 @@ export function JournalComposer({ visible, onClose, onSave }: JournalComposerPro
         const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
         const storagePath = `${user.id}/${fileName}`;
 
-        // Read via expo-file-system File API (reliable for local URIs on all platforms)
-        const fileRef = new File(item.localUri);
-        const base64 = await fileRef.base64();
-        const byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        const mediaType = item.mimeType.startsWith('video/') ? 'video' : 'photo';
+        const contentType = normalizeVaultMimeType(item.mimeType, mediaType);
+        const byteArray = await readLocalFileAsBytes(item.localUri);
 
         const { error: uploadErr } = await supabase.storage
           .from(BUCKET)
-          .upload(storagePath, byteArray, { contentType: item.mimeType, upsert: false });
+          .upload(storagePath, toStorageUploadBody(byteArray), { contentType, upsert: false });
 
         if (uploadErr) throw uploadErr;
-
-        const mediaType = item.mimeType.startsWith('video/') ? 'video' : 'photo';
         const { data: row, error: dbErr } = await supabase
           .from('media_vault')
           .insert({
@@ -122,8 +123,10 @@ export function JournalComposer({ visible, onClose, onSave }: JournalComposerPro
             media_type: mediaType,
             storage_path: storagePath,
             memory_year: new Date().getFullYear(),
-            memory_date: new Date().toISOString().slice(0, 10),
-            metadata: { localJournalId: localId },
+            metadata: {
+              localJournalId: localId,
+              memoryDate: new Date().toISOString().slice(0, 10),
+            },
           })
           .select('id')
           .single();

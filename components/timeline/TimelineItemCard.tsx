@@ -13,8 +13,11 @@ const MEDIA_EMOJI: Record<MediaType, string> = {
 };
 
 function formatMemoryDate(row: MediaVaultRow): string {
-  if (row.memory_date) {
-    const d = new Date(row.memory_date + 'T00:00:00');
+  const iso =
+    row.memory_date ??
+    (typeof row.metadata?.memoryDate === 'string' ? row.metadata.memoryDate : null);
+  if (iso) {
+    const d = new Date(iso + 'T00:00:00');
     if (!isNaN(d.getTime())) {
       return d.toLocaleDateString(undefined, {
         day: 'numeric',

@@ -79,11 +79,19 @@ export async function refreshAvatarKnowledge(
         .eq('id', userId);
     } catch (err) {
       console.warn('[refresh-avatar-knowledge] BP agent update failed:', err);
+      if (!profile?.bp_agent_id) {
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+      agentId = profile.bp_agent_id;
       await supabase
         .from('profiles')
         .update({ avatar_knowledge_updated_at: new Date().toISOString() })
         .eq('id', userId);
     }
+  } else if (!agentId) {
+    throw new Error(
+      'BEY_API_KEY is not configured on the server. Run: npx supabase secrets set BEY_API_KEY=<your_key>',
+    );
   } else {
     await supabase
       .from('profiles')

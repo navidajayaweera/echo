@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('display_name, persona_traits, bp_agent_id')
+      .select('display_name, persona_traits, bp_agent_id, bp_avatar_id')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -77,9 +77,40 @@ Deno.serve(async (req: Request) => {
       context,
     );
 
+    // Ensure a managed Bey agent exists before starting a live call (embed may have failed earlier).
+    let bpAgentId = profile?.bp_agent_id ?? null;
+    if (providerName === 'beyond_presence') {
+      const hasAvatar =
+        Boolean(profile?.bp_avatar_id?.trim()) ||
+        Boolean(Deno.env.get('BEY_DEFAULT_AVATAR_ID')?.trim());
+      if (!hasAvatar) {
+        throw new Error(
+          'Link an Echo avatar in Settings → Beyond Presence → Load avatars, then pick one with status Ready.',
+        );
+      }
+
+      const refresh = await refreshAvatarKnowledge(supabase, user.id);
+      bpAgentId = refresh.agentId ?? bpAgentId;
+
+      if (!bpAgentId) {
+        const { data: refreshed } = await supabase
+          .from('profiles')
+          .select('bp_agent_id')
+          .eq('id', user.id)
+          .maybeSingle();
+        bpAgentId = refreshed?.bp_agent_id ?? null;
+      }
+
+      if (!bpAgentId) {
+        throw new Error(
+          'Could not create your Beyond Presence agent. Confirm BEY_API_KEY is set on Supabase (npx supabase secrets set BEY_API_KEY=...) and redeploy edge functions.',
+        );
+      }
+    }
+
     const provider = PROVIDERS[providerName];
     const result = await provider.run(body, systemPrompt, {
-      bpAgentId: profile?.bp_agent_id ?? null,
+      bpAgentId,
     });
 
     if (providerName === 'beyond_presence' && 'agentId' in result && result.agentId) {

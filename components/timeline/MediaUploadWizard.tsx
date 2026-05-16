@@ -70,6 +70,7 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
   const [title, setTitle] = useState('');
   const [storyText, setStoryText] = useState('');  // primary text / description
   const [memoryDate, setMemoryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const reset = () => {
     setStep(1);
@@ -78,6 +79,7 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
     setTitle('');
     setStoryText('');
     setMemoryDate(new Date().toISOString().slice(0, 10));
+    setSaveError(null);
   };
 
   const close = () => {
@@ -160,8 +162,13 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
       payload.fileName = asset.fileName;
     }
 
-    await onUpload(payload);
-    close();
+    setSaveError(null);
+    try {
+      await onUpload(payload);
+      close();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Upload failed');
+    }
   };
 
   const parseDateDisplay = (iso: string): string => {
@@ -342,6 +349,8 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
                 </Pressable>
               </View>
               <Text style={styles.dateHint}>Use ‹ › to go back or forward one day</Text>
+
+              {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
 
               <View style={styles.stepActions}>
                 <Pressable
@@ -619,5 +628,11 @@ const styles = StyleSheet.create({
     color: EchoColors.bg,
     fontSize: 16,
     fontWeight: '700',
+  },
+  saveError: {
+    color: '#E8A0A0',
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 20,
   },
 });

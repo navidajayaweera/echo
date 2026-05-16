@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { refreshAvatarKnowledge } from '@/lib/avatar-feed';
 import { callAISession } from '@/lib/ai-session';
 import type {
   AIProviderName,
@@ -82,6 +83,16 @@ export function useAISession(persona: Persona | null = null) {
     sessionStore.setConnecting(provider);
 
     try {
+      if (provider === 'beyond_presence') {
+        // #region agent log
+        fetch('http://127.0.0.1:7744/ingest/3aeff884-f869-49e5-b3ca-024823977ed4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d7c109'},body:JSON.stringify({sessionId:'d7c109',runId:'upload-train-1',hypothesisId:'D',location:'hooks/useAISession.ts:startSession:refresh:start',message:'Calling refresh-avatar-knowledge before BP session',data:{provider},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        await refreshAvatarKnowledge();
+        // #region agent log
+        fetch('http://127.0.0.1:7744/ingest/3aeff884-f869-49e5-b3ca-024823977ed4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d7c109'},body:JSON.stringify({sessionId:'d7c109',runId:'upload-train-1',hypothesisId:'D',location:'hooks/useAISession.ts:startSession:refresh:done',message:'refresh-avatar-knowledge completed before BP session',data:{provider},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+      }
+
       const result: StartSessionResult = await callAISession({
         provider,
         messages: [],
@@ -107,6 +118,9 @@ export function useAISession(persona: Persona | null = null) {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Connection failed';
+      // #region agent log
+      fetch('http://127.0.0.1:7744/ingest/3aeff884-f869-49e5-b3ca-024823977ed4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d7c109'},body:JSON.stringify({sessionId:'d7c109',runId:'upload-train-1',hypothesisId:'E',location:'hooks/useAISession.ts:startSession:catch',message:'Session start failed',data:{provider,errorMessage:message},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setState({ status: 'error', message });
       sessionStore.setError(message);
     }

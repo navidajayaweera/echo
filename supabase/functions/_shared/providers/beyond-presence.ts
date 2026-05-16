@@ -25,7 +25,7 @@ export class BeyondPresenceProvider implements AIProvider {
 
     if (!options?.bpAgentId) {
       throw new Error(
-        'No Beyond Presence agent exists for this user yet. Upload journals or memories first to train the avatar, then retry.',
+        'Beyond Presence agent is not ready. Open Settings → pick a Ready Echo avatar, then start the session again.',
       );
     }
 
