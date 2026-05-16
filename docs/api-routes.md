@@ -94,7 +94,7 @@ Content-Type: application/json
 ```
 1. verifyUser(Authorization header)
 2. Load profiles row → persona_traits
-3. Embed latest user message (or default recall query) with OpenAI `text-embedding-3-small`
+3. Embed latest user message (or default recall query) with Gemini `gemini-embedding-001`
 4. `rpc('match_memories')` for semantic recall
 5. Fallback to last 10 journals if embedding/RPC fails or no semantic matches
 6. buildSystemPrompt(displayName, traits, memories)
@@ -148,7 +148,7 @@ Guidelines:
 
 ## `POST /embed-journal`
 
-**Purpose:** Chunk a journal entry's body, embed each chunk with OpenAI `text-embedding-3-small`, and store vectors in `journal_embeddings`. Marks `journals.is_embedded = true` on completion. Idempotent — re-running deletes old chunks and re-embeds.
+**Purpose:** Chunk a journal entry's body, embed each chunk with Gemini `gemini-embedding-001`, and store vectors in `journal_embeddings`. Marks `journals.is_embedded = true` on completion. Idempotent — re-running deletes old chunks and re-embeds.
 
 ### Auth modes
 
@@ -180,8 +180,8 @@ Guidelines:
 |--------|------|-------|
 | `401` | `{ error: "Unauthorized" }` | JWT missing or user doesn't own the journal |
 | `500` | `{ error: "Journal not found: …" }` | Invalid `journal_id` |
-| `500` | `{ error: "OPENAI_API_KEY is not set" }` | Missing secret |
-| `500` | `{ error: "OpenAI embeddings error 429: …" }` | Rate limit / quota |
+| `500` | `{ error: "GEMINI_API_KEY is not set" }` | Missing secret |
+| `500` | `{ error: "Gemini embeddings error 429: …" }` | Rate limit / quota |
 
 ### Internal flow
 
@@ -191,7 +191,7 @@ Guidelines:
 3. Enforce ownership if called by user JWT
 4. If existing journal_embeddings rows → DELETE (re-embed)
 5. Chunk body into ~400 char overlapping segments
-6. POST to OpenAI /v1/embeddings (batch all chunks)
+6. POST to Gemini batchEmbedContents (batch all chunks)
 7. UPSERT journal_embeddings rows
 8. UPDATE journals SET is_embedded = true
 9. Return { journal_id, chunks_embedded }

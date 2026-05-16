@@ -66,7 +66,7 @@ User writes entry in JournalComposer
           → supabase.from('journals').upsert({ ..., local_id })
           → On success: flip pendingSync → false, store remote id
           → auto POST /functions/v1/embed-journal { journal_id }
-      → embed-journal chunks body → OpenAI embeddings → journal_embeddings table
+      → embed-journal chunks body → Gemini embeddings → journal_embeddings table
 ```
 
 ### C. Presence session (LLM providers)

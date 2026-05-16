@@ -1,7 +1,7 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
+import { embedDocumentTexts } from '../_shared/gemini-embeddings.ts';
 import { createAdminClient, verifyUser } from '../_shared/supabase-admin.ts';
 
-const EMBEDDING_MODEL = 'text-embedding-3-small';
 const CHUNK_SIZE = 400; // characters (approx 100 tokens)
 const CHUNK_OVERLAP = 80;
 
@@ -31,33 +31,6 @@ function chunkText(text: string): string[] {
   return chunks.filter((c) => c.length > 20);
 }
 
-// ── OpenAI Embeddings ─────────────────────────────────────────────────────────
-
-async function embedTexts(texts: string[], apiKey: string): Promise<number[][]> {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: texts,
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenAI embeddings error ${response.status}: ${err}`);
-  }
-
-  const data = await response.json();
-  // Sort by index to ensure order is preserved
-  return (data.data as { index: number; embedding: number[] }[])
-    .sort((a, b) => a.index - b.index)
-    .map((d) => d.embedding);
-}
-
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -76,9 +49,6 @@ Deno.serve(async (req: Request) => {
       const user = await verifyUser(authHeader);
       userId = user.id;
     }
-
-    const openAiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiKey) throw new Error('OPENAI_API_KEY is not set');
 
     const { journal_id } = await req.json();
     if (!journal_id) throw new Error('journal_id is required');
@@ -120,8 +90,8 @@ Deno.serve(async (req: Request) => {
     const fullText = [journal.title, journal.body].filter(Boolean).join('\n\n');
     const chunks = chunkText(fullText);
 
-    // 4. Embed all chunks in one API call
-    const embeddings = await embedTexts(chunks, openAiKey);
+    // 4. Embed all chunks via Gemini
+    const embeddings = await embedDocumentTexts(chunks);
 
     // 5. Upsert embeddings
     const rows = chunks.map((chunk, i) => ({
