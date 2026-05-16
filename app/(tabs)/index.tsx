@@ -1,98 +1,155 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { useJournalCache } from '@/hooks/useJournalCache';
+import { useJournalSyncContext } from '@/providers/JournalSyncProvider';
+import { useAuth } from '@/providers/AuthProvider';
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const insets = useSafeAreaInsets();
+  const { profile, isConfigured } = useAuth();
+  const { entries, refresh } = useJournalCache();
+  const { isSyncing, lastSyncAt } = useJournalSyncContext();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
+
+  const name = profile?.display_name?.trim() || 'Friend';
+  const pendingCount = entries.filter((e) => e.pendingSync).length;
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top + 24 }]}>
+      <Text style={styles.greeting}>{getGreeting()},</Text>
+      <Text style={styles.name}>{name}</Text>
+
+      <View style={styles.statsCard}>
+        <View style={styles.stat}>
+          <Text style={styles.statValue}>{entries.length}</Text>
+          <Text style={styles.statLabel}>Memories saved</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.stat}>
+          <Text style={styles.statValue}>{pendingCount}</Text>
+          <Text style={styles.statLabel}>Pending sync</Text>
+        </View>
+      </View>
+
+      <View style={styles.statusCard}>
+        <Text style={styles.statusTitle}>Sync status</Text>
+        <Text style={styles.statusText}>
+          {!isConfigured
+            ? 'Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env'
+            : isSyncing
+              ? 'Syncing with Supabase…'
+              : lastSyncAt
+                ? `Last synced ${new Date(lastSyncAt).toLocaleString()}`
+                : 'Ready to sync'}
+        </Text>
+      </View>
+
+      <View style={styles.ctaPlaceholder}>
+        <Text style={styles.ctaText}>Begin Echo Session</Text>
+        <Text style={styles.ctaHint}>Presence tab coming in a later sprint</Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: '#0A0A0B',
+    paddingHorizontal: 24,
   },
-  stepContainer: {
-    gap: 8,
+  greeting: {
+    color: '#8B8884',
+    fontSize: 18,
+    fontWeight: '300',
+  },
+  name: {
+    color: '#F4F2EF',
+    fontSize: 36,
+    fontWeight: '300',
+    letterSpacing: -0.5,
+    marginTop: 4,
+    marginBottom: 32,
+  },
+  statsCard: {
+    flexDirection: 'row',
+    backgroundColor: '#141416',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#232326',
+    marginBottom: 16,
+  },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    color: '#F4F2EF',
+    fontSize: 32,
+    fontWeight: '300',
+  },
+  statLabel: {
+    color: '#6B6966',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  divider: {
+    width: 1,
+    backgroundColor: '#232326',
+    marginHorizontal: 16,
+  },
+  statusCard: {
+    backgroundColor: '#141416',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#232326',
+    marginBottom: 24,
+  },
+  statusTitle: {
+    color: '#8B8884',
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  statusText: {
+    color: '#F4F2EF',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  ctaPlaceholder: {
+    backgroundColor: '#E8E6E3',
+    borderRadius: 14,
+    padding: 18,
+    alignItems: 'center',
+    opacity: 0.7,
+  },
+  ctaText: {
+    color: '#0A0A0B',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  ctaHint: {
+    color: '#4A4845',
+    fontSize: 12,
+    marginTop: 4,
   },
 });
