@@ -10,6 +10,7 @@ import type {
   LLMResult,
   StartSessionResult,
 } from '@/lib/types/ai-session';
+import type { AvatarVoiceState } from '@/components/presence/AvatarPulse';
 
 const PROVIDER_STORAGE_KEY = 'echo_ai_provider';
 const DEFAULT_PROVIDER: AIProviderName = 'openai';
@@ -41,6 +42,14 @@ export function useAISession() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // ── Avatar voice state (Beyond Presence only) ─────────────────────────────
+  // Drives the AvatarPulse rings and PTT button appearance.
+  // IDLE     → session connected, avatar waiting
+  // LISTENING → user holding PTT, LiveKit microphone active
+  // SPEAKING  → avatar responding (simulated until LiveKit RN data events wire up)
+  const [avatarVoiceState, setAvatarVoiceState] = useState<AvatarVoiceState>('IDLE');
+  const speakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Persist provider preference
   useEffect(() => {
@@ -136,10 +145,38 @@ export function useAISession() {
     [state, provider, messages],
   );
 
+  // ── Avatar voice state transitions (Beyond Presence) ─────────────────────
+
+  /**
+   * Call onPressIn of the PTT button.
+   * Marks the microphone as active; the LiveKit SDK should un-mute the track here.
+   */
+  const startListening = useCallback(() => {
+    if (state.status !== 'active' || state.provider !== 'beyond_presence') return;
+    if (speakTimerRef.current) clearTimeout(speakTimerRef.current);
+    setAvatarVoiceState('LISTENING');
+  }, [state]);
+
+  /**
+   * Call onPressOut of the PTT button.
+   * Simulates avatar processing + speaking for ~3 s, then returns to IDLE.
+   * Replace the timeout body with a LiveKit DataReceived handler when wiring
+   * real speech events.
+   */
+  const stopListening = useCallback(() => {
+    if (avatarVoiceState !== 'LISTENING') return;
+    setAvatarVoiceState('SPEAKING');
+    speakTimerRef.current = setTimeout(() => {
+      setAvatarVoiceState('IDLE');
+    }, 3200);
+  }, [avatarVoiceState]);
+
   // ── End session ───────────────────────────────────────────────────────────
 
   const endSession = useCallback(() => {
     abortRef.current?.abort();
+    if (speakTimerRef.current) clearTimeout(speakTimerRef.current);
+    setAvatarVoiceState('IDLE');
     setState({ status: 'idle' });
     setMessages([]);
     setIsTyping(false);
@@ -165,8 +202,11 @@ export function useAISession() {
     isTyping,
     livekitCreds,
     latestAssistantMessage,
+    avatarVoiceState,
     startSession,
     sendMessage,
     endSession,
+    startListening,
+    stopListening,
   };
 }
