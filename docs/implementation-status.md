@@ -83,7 +83,7 @@ Last updated: May 16, 2026
 
 ### Edge Functions
 - `start-ai-session` — AI provider router (OpenAI / Gemini / Beyond Presence) with semantic recall via `match_memories` + recency fallback
-- `embed-journal` — Journal chunking + OpenAI text-embedding-3-small + `journal_embeddings` upsert
+- `embed-journal` — Journal chunking + Gemini `gemini-embedding-001` + `journal_embeddings` upsert
 
 ---
 

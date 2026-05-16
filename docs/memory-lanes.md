@@ -59,7 +59,7 @@ MediaUploadPicker (UI modal)
 
 ### How it works
 
-Each journal entry is transformed into a vector representation using OpenAI's `text-embedding-3-small` model (1536 dimensions). The vectors are stored in the `journal_embeddings` table with an HNSW index for fast approximate nearest-neighbour (ANN) search.
+Each journal entry is transformed into a vector representation using Google's `gemini-embedding-001` model (1536 dimensions via `outputDimensionality`). The vectors are stored in the `journal_embeddings` table with an HNSW index for fast approximate nearest-neighbour (ANN) search.
 
 ```
 POST /functions/v1/embed-journal { journal_id }
@@ -71,8 +71,9 @@ POST /functions/v1/embed-journal { journal_id }
        Chunk 1: chars 320–720
        Chunk 2: chars 640–1040
        …
-  4. Batch POST to OpenAI /v1/embeddings
-       model: text-embedding-3-small
+  4. Batch POST to Gemini batchEmbedContents
+       model: gemini-embedding-001
+       taskType: RETRIEVAL_DOCUMENT
        input: [chunk0, chunk1, chunk2, …]
   5. UPSERT journal_embeddings:
        { journal_id, user_id, chunk_index, chunk_text, embedding: vector(1536) }

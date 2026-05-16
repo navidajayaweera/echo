@@ -58,7 +58,8 @@ Supabase JS client package: `@supabase/supabase-js` ^2.x
 
 | Provider | SDK / API | Used for |
 |----------|-----------|----------|
-| **OpenAI** | REST (`/v1/chat/completions`, `/v1/embeddings`) | LLM chat in Presence + journal embeddings |
+| **OpenAI** | REST (`/v1/chat/completions`) | LLM chat in Presence (OpenAI provider) |
+| **Google Gemini** | REST (`embedContent`, `batchEmbedContents`, `generateContent`) | Text embeddings + Gemini chat provider |
 | **Google Gemini** | REST (`generativelanguage.googleapis.com`) | Alternative LLM chat in Presence |
 | **Beyond Presence** | REST (`api.beyondpresence.ai/v1/sessions`) | Hyper-realistic avatar sessions (LiveKit-backed) |
 

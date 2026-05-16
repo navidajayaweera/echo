@@ -1,4 +1,5 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
+import { embedQueryText } from '../_shared/gemini-embeddings.ts';
 import { createAdminClient, verifyUser } from '../_shared/supabase-admin.ts';
 import { buildSystemPrompt } from '../_shared/build-system-prompt.ts';
 import { BeyondPresenceProvider } from '../_shared/providers/beyond-presence.ts';
@@ -17,7 +18,6 @@ const PROVIDERS: Record<ProviderName, AIProvider> = {
   openai: new OpenAIProvider(),
   gemini: new GeminiProvider(),
 };
-const EMBEDDING_MODEL = 'text-embedding-3-small';
 
 type PromptMemory = {
   title: string | null;
@@ -40,32 +40,6 @@ function getMemoryQuery(messages: ChatMessage[] | undefined): string {
   return 'important personal memories and life experiences';
 }
 
-async function embedQueryText(queryText: string): Promise<number[] | null> {
-  const openAiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openAiKey) return null;
-
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${openAiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: queryText,
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenAI embeddings error ${response.status}: ${err}`);
-  }
-
-  const data = await response.json();
-  const embedding = data.data?.[0]?.embedding;
-  return Array.isArray(embedding) ? embedding : null;
-}
-
 async function loadRecentMemories(
   supabase: ReturnType<typeof createAdminClient>,
   userId: string,
@@ -84,9 +58,8 @@ async function loadSemanticMemories(
   supabase: ReturnType<typeof createAdminClient>,
   userId: string,
   queryText: string,
-): Promise<PromptMemory[] | null> {
+): Promise<PromptMemory[]> {
   const embedding = await embedQueryText(queryText);
-  if (!embedding) return null;
 
   const { data, error } = await supabase.rpc('match_memories', {
     query_embedding: JSON.stringify(embedding),
@@ -143,7 +116,7 @@ Deno.serve(async (req: Request) => {
 
     try {
       const semanticMemories = await loadSemanticMemories(supabase, user.id, queryText);
-      memories = semanticMemories && semanticMemories.length > 0
+      memories = semanticMemories.length > 0
         ? semanticMemories
         : await loadRecentMemories(supabase, user.id);
     } catch (err) {
