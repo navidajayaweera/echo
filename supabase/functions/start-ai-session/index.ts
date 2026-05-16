@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
     const user = await verifyUser(req.headers.get('Authorization'));
 
     const body: StartSessionRequest = await req.json();
-    const { provider: providerName, messages, persona_overrides } = body;
+    const { provider: providerName, messages, persona_overrides, context } = body;
 
     if (!providerName || !(providerName in PROVIDERS)) {
       return json({
@@ -74,6 +74,7 @@ Deno.serve(async (req: Request) => {
       profile?.display_name ?? null,
       personaTraits,
       memories,
+      context,
     );
 
     const provider = PROVIDERS[providerName];

@@ -103,7 +103,10 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>No account?</Text>
+            <Link href="/welcome" style={styles.link}>
+              Back to welcome
+            </Link>
+            <Text style={styles.footerText}> · No account?</Text>
             <Link href="/signup" style={styles.link}>
               Create one
             </Link>

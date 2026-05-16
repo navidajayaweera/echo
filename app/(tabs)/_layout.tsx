@@ -13,13 +13,13 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: EchoColors.accent,
+        tabBarActiveTintColor: EchoColors.primary,
         tabBarInactiveTintColor: EchoColors.textDim,
         tabBarLabelStyle: styles.tabLabel,
         tabBarIconStyle: styles.tabIcon,
         tabBarStyle: {
-          backgroundColor: EchoColors.bg,
-          borderTopColor: EchoColors.border,
+          backgroundColor: EchoColors.bgLowest,
+          borderTopColor: EchoColors.glassBorder,
           borderTopWidth: StyleSheet.hairlineWidth,
           height: tabBarHeight,
           paddingTop: 12,
@@ -41,10 +41,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="journal"
+        name="personas"
         options={{
-          title: 'Journal',
-          tabBarIcon: ({ color }) => <IconSymbol size={30} name="book.fill" color={color} />,
+          title: 'Personas',
+          tabBarIcon: ({ color }) => <IconSymbol size={30} name="person.2.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -55,10 +55,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="timeline"
+        name="vault"
         options={{
-          title: 'Timeline',
-          tabBarIcon: ({ color }) => <IconSymbol size={30} name="clock.fill" color={color} />,
+          title: 'Vault',
+          tabBarIcon: ({ color }) => <IconSymbol size={30} name="archivebox.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -68,6 +68,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={30} name="gearshape.fill" color={color} />,
         }}
       />
+      <Tabs.Screen name="journal" options={{ href: null }} />
+      <Tabs.Screen name="timeline" options={{ href: null }} />
     </Tabs>
   );
 }

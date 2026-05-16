@@ -1,0 +1,19 @@
+﻿{
+    "id":  2,
+    "jsonrpc":  "2.0",
+    "result":  {
+                   "content":  [
+                                   {
+                                       "text":  "{\"name\":\"projects/1078249078019696986\",\"title\":\"Echoes - Memory Preservation App\",\"visibility\":\"PRIVATE\",\"projectType\":\"PROJECT_DESIGN\",\"origin\":\"STITCH\"}",
+                                       "type":  "text"
+                                   }
+                               ],
+                   "structuredContent":  {
+                                             "name":  "projects/1078249078019696986",
+                                             "origin":  "STITCH",
+                                             "projectType":  "PROJECT_DESIGN",
+                                             "title":  "Echoes - Memory Preservation App",
+                                             "visibility":  "PRIVATE"
+                                         }
+               }
+}

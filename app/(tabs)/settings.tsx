@@ -125,7 +125,7 @@ export default function SettingsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: contentBottom }}>
-        <SectionHeader title="Settings" subtitle="Persona & account" />
+        <SectionHeader title="Settings" subtitle="Account, persona engine & safety" />
 
         <Text style={styles.accountEmail}>{user?.email ?? (isAnonymous ? 'Guest session' : '')}</Text>
 
@@ -159,6 +159,14 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.block}>
+          <Text style={styles.blockTitle}>AI disclosure</Text>
+          <Text style={styles.disclosure}>
+            Echoes responses are AI-generated representations built from memories. They are not
+            living consciousness and should not replace real relationships or professional care.
+          </Text>
+        </View>
+
+        <View style={styles.block}>
           <Text style={styles.blockTitle}>Connections</Text>
           <ConnectionChecklist items={checklist} />
         </View>
@@ -185,5 +193,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 12,
+  },
+  disclosure: {
+    color: EchoColors.textMuted,
+    fontSize: 14,
+    lineHeight: 22,
   },
 });
