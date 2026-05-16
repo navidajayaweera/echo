@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -15,7 +16,7 @@ import {
 import { MemoryModePane } from '@/components/presence/MemoryModePane';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { EchoColors, EchoFonts, EchoLayout } from '@/constants/echo-theme';
+import { EchoColors, EchoFonts } from '@/constants/echo-theme';
 import { useAppInsets } from '@/hooks/use-app-insets';
 import { useAISession } from '@/hooks/useAISession';
 import { useMemoryOverlay } from '@/hooks/useMemoryOverlay';
@@ -26,6 +27,19 @@ import {
 } from '@/lib/types/ai-session';
 
 const PROVIDERS: AIProviderName[] = ['openai', 'gemini', 'beyond_presence'];
+
+const MODEL_LABEL: Record<AIProviderName, string> = {
+  openai: 'GPT-4o mini',
+  gemini: 'Gemini 1.5 Flash',
+  beyond_presence: 'Beyond Presence',
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -62,32 +76,257 @@ function ProviderPicker({
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+// ── Animated message bubble ────────────────────────────────────────────────────
+
+function MessageBubble({
+  message,
+  timestamp,
+  onLongPress,
+}: {
+  message: ChatMessage;
+  timestamp?: number;
+  onLongPress?: () => void;
+}) {
   const isUser = message.role === 'user';
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
+
   return (
-    <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
-      <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant]}>
-        {message.content}
-      </Text>
+    <Animated.View
+      style={[
+        styles.bubbleRow,
+        isUser ? styles.bubbleRowUser : styles.bubbleRowAssistant,
+        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+      ]}>
+      <Pressable
+        onLongPress={onLongPress}
+        style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
+        <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant]}>
+          {message.content}
+        </Text>
+      </Pressable>
+      {timestamp && (
+        <Text style={[styles.timestamp, isUser ? styles.timestampUser : styles.timestampAssistant]}>
+          {formatTime(timestamp)}
+        </Text>
+      )}
+    </Animated.View>
+  );
+}
+
+// ── Session header ─────────────────────────────────────────────────────────────
+
+function SessionHeader({
+  provider,
+  onEnd,
+  onClear,
+}: {
+  provider: AIProviderName;
+  onEnd: () => void;
+  onClear: () => void;
+}) {
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+
+  return (
+    <View style={styles.sessionHeader}>
+      <View style={styles.sessionHeaderLeft}>
+        <View style={styles.liveDot} />
+        <Text style={styles.sessionProvider}>{AI_PROVIDER_LABELS[provider]}</Text>
+        <Text style={styles.sessionModel}>{MODEL_LABEL[provider]}</Text>
+      </View>
+      <View style={styles.sessionHeaderRight}>
+        <Text style={styles.sessionTimer}>{mm}:{ss}</Text>
+        <Pressable style={styles.headerBtn} onPress={onClear} hitSlop={8}>
+          <IconSymbol name="trash.fill" size={14} color={EchoColors.textMuted} />
+        </Pressable>
+        <Pressable style={[styles.headerBtn, styles.endBtnHeader]} onPress={onEnd} hitSlop={8}>
+          <Text style={styles.endBtnText}>End</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
-function BPPlaceholder({ roomName }: { roomName: string }) {
+// ── Typing indicator ───────────────────────────────────────────────────────────
+
+function TypingIndicator() {
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+        ]),
+      );
+    const a1 = pulse(dot1, 0);
+    const a2 = pulse(dot2, 150);
+    const a3 = pulse(dot3, 300);
+    a1.start(); a2.start(); a3.start();
+    return () => { a1.stop(); a2.stop(); a3.stop(); };
+  }, [dot1, dot2, dot3]);
+
   return (
-    <View style={styles.bpViewport}>
-      <IconSymbol name="video.fill" size={40} color={EchoColors.textMuted} />
-      <Text style={styles.bpTitle}>Beyond Presence</Text>
-      <Text style={styles.bpSub}>Room: {roomName}</Text>
-      <Text style={styles.bpSub}>LiveKit video stream connection ready.</Text>
-      <Text style={[styles.bpSub, { marginTop: 8, color: EchoColors.accentWarm }]}>
-        Wire LiveKit RN SDK in the next sprint to see the avatar here.
-      </Text>
+    <View style={[styles.bubble, styles.bubbleAssistant, styles.typingBubble]}>
+      {[dot1, dot2, dot3].map((dot, i) => (
+        <Animated.View key={i} style={[styles.typingDot, { opacity: dot }]} />
+      ))}
+    </View>
+  );
+}
+
+// ── Chat input row ─────────────────────────────────────────────────────────────
+
+function ChatInputRow({
+  value,
+  onChange,
+  onSend,
+  disabled,
+  placeholder,
+}: {
+  value: string;
+  onChange: (t: string) => void;
+  onSend: () => void;
+  disabled: boolean;
+  placeholder?: string;
+}) {
+  const canSend = value.trim().length > 0 && !disabled;
+
+  return (
+    <View style={styles.inputRow}>
+      <TextInput
+        style={styles.textInput}
+        placeholder={placeholder ?? 'Message your echo…'}
+        placeholderTextColor={EchoColors.textDim}
+        value={value}
+        onChangeText={onChange}
+        returnKeyType="send"
+        onSubmitEditing={onSend}
+        blurOnSubmit={false}
+        multiline
+        maxLength={2000}
+        editable={!disabled}
+      />
+      <Pressable
+        style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
+        onPress={onSend}
+        disabled={!canSend}>
+        <IconSymbol name="paperplane.fill" size={18} color={canSend ? EchoColors.bg : EchoColors.textDim} />
+      </Pressable>
+    </View>
+  );
+}
+
+// ── Suggestion chips (shown on idle) ──────────────────────────────────────────
+
+const SUGGESTIONS = [
+  'Tell me about your childhood',
+  'What advice would you give me?',
+  'Share a favourite memory',
+  'How did you meet your partner?',
+];
+
+function SuggestionChips({ onSelect }: { onSelect: (s: string) => void }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.suggestionsRow}>
+      {SUGGESTIONS.map((s) => (
+        <Pressable key={s} style={styles.suggestionChip} onPress={() => onSelect(s)}>
+          <Text style={styles.suggestionText}>{s}</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ── Beyond Presence text panel ─────────────────────────────────────────────────
+
+function BPTextPanel({
+  value,
+  onChange,
+  onSend,
+  disabled,
+}: {
+  value: string;
+  onChange: (t: string) => void;
+  onSend: () => void;
+  disabled: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const heightAnim = useRef(new Animated.Value(0)).current;
+
+  const toggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    Animated.spring(heightAnim, {
+      toValue: next ? 1 : 0,
+      useNativeDriver: false,
+      tension: 80,
+      friction: 12,
+    }).start();
+  };
+
+  const panelHeight = heightAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 96],
+  });
+
+  return (
+    <View style={styles.bpTextPanel}>
+      <Pressable style={styles.bpTextToggle} onPress={toggle}>
+        <IconSymbol name="bubble.left.fill" size={15} color={EchoColors.textMuted} />
+        <Text style={styles.bpTextToggleLabel}>
+          {expanded ? 'Hide text input' : 'Type to avatar'}
+        </Text>
+        <IconSymbol
+          name={expanded ? 'chevron.down' : 'chevron.up'}
+          size={12}
+          color={EchoColors.textDim}
+        />
+      </Pressable>
+      <Animated.View style={[styles.bpTextExpanded, { height: panelHeight, overflow: 'hidden' }]}>
+        <ChatInputRow
+          value={value}
+          onChange={onChange}
+          onSend={onSend}
+          disabled={disabled}
+          placeholder="Type to the avatar…"
+        />
+      </Animated.View>
     </View>
   );
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
+
+interface TimestampedMessage {
+  message: ChatMessage;
+  timestamp: number;
+}
 
 export default function PresenceScreen() {
   const { fabBottom, horizontal, left, right, top } = useAppInsets({ includeTabBar: true });
@@ -107,6 +346,8 @@ export default function PresenceScreen() {
   const { isOpen: memoryOpen, memory, close: closeMemory } = useMemoryOverlay();
 
   const [inputText, setInputText] = useState('');
+  const [bpInputText, setBpInputText] = useState('');
+  const [timestampedMessages, setTimestampedMessages] = useState<TimestampedMessage[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
   const isIdle = state.status === 'idle';
@@ -116,15 +357,70 @@ export default function PresenceScreen() {
   const isBP = isActive && provider === 'beyond_presence';
   const isLLM = isActive && (provider === 'openai' || provider === 'gemini');
 
-  const handleSend = async () => {
+  // Sync messages → timestamped list
+  useEffect(() => {
+    setTimestampedMessages((prev) => {
+      const prevLen = prev.length;
+      if (messages.length === 0) return [];
+      if (messages.length <= prevLen) return prev;
+      const newOnes = messages.slice(prevLen).map((m) => ({ message: m, timestamp: Date.now() }));
+      return [...prev, ...newOnes];
+    });
+  }, [messages]);
+
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+  }, []);
+
+  // ── Send handlers ──────────────────────────────────────────────────────────
+
+  const handleSend = useCallback(async () => {
     const text = inputText.trim();
     if (!text || !isLLM || isTyping) return;
     setInputText('');
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await sendMessage(text);
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-  };
+    scrollToBottom();
+  }, [inputText, isLLM, isTyping, sendMessage, scrollToBottom]);
 
-  // ── Layout ──────────────────────────────────────────────────────────────────
+  const handleBPSend = useCallback(async () => {
+    const text = bpInputText.trim();
+    if (!text || !isBP) return;
+    setBpInputText('');
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Send over LiveKit data channel (text) — wire when LiveKit RN SDK is installed
+    console.log('[BP] Text message queued:', text);
+  }, [bpInputText, isBP]);
+
+  const handleSuggestion = useCallback(
+    async (text: string) => {
+      if (isIdle) {
+        await startSession();
+        // sendMessage will be called after session is active via useEffect
+        setInputText(text);
+      } else if (isLLM) {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        await sendMessage(text);
+        scrollToBottom();
+      }
+    },
+    [isIdle, isLLM, startSession, sendMessage, scrollToBottom],
+  );
+
+  const handleClearChat = useCallback(() => {
+    endSession();
+    setTimestampedMessages([]);
+    setInputText('');
+  }, [endSession]);
+
+  const handleLongPressBubble = useCallback((content: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Clipboard.setStringAsync(content); — add expo-clipboard for full copy support
+    console.log('[copy]', content);
+  }, []);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <ScreenContainer withGradient={false} edges={['top']} includeTabBarPadding>
       <KeyboardAvoidingView
@@ -132,128 +428,174 @@ export default function PresenceScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={top + 56}>
 
-        {/* ── Provider picker ── */}
-        <View style={styles.pickerWrap}>
-          <ProviderPicker
-            selected={provider}
-            onSelect={setProvider}
-            disabled={isActive || isConnecting}
-          />
-        </View>
-
-        {/* ── Session state ── */}
-        {isIdle && (
-          <View style={styles.centeredState}>
-            <IconSymbol name="video.fill" size={48} color={EchoColors.textMuted} />
-            <Text style={styles.stateTitle}>Presence</Text>
-            <Text style={styles.stateSub}>
-              {provider === 'beyond_presence'
-                ? 'Start a live avatar session via Beyond Presence + LiveKit.'
-                : `Chat with the memory echo powered by ${AI_PROVIDER_LABELS[provider]}.`}
-            </Text>
-            <Pressable style={styles.startBtn} onPress={startSession}>
-              <Text style={styles.startBtnText}>Begin session</Text>
-            </Pressable>
+        {/* ── Provider picker (hidden while active) ── */}
+        {!isActive && !isConnecting && (
+          <View style={styles.pickerWrap}>
+            <ProviderPicker selected={provider} onSelect={setProvider} disabled={isConnecting} />
           </View>
         )}
 
+        {/* ── Active session header ── */}
+        {isActive && (
+          <SessionHeader provider={provider} onEnd={endSession} onClear={handleClearChat} />
+        )}
+
+        {/* ────────────────── IDLE ────────────────── */}
+        {isIdle && (
+          <View style={styles.idleContainer}>
+            <View style={styles.idleTop}>
+              <View style={styles.echoAvatar}>
+                <Text style={styles.echoAvatarLetter}>E</Text>
+              </View>
+              <Text style={styles.stateTitle}>
+                {provider === 'beyond_presence' ? 'Live Avatar' : 'Echo Chat'}
+              </Text>
+              <Text style={styles.stateSub}>
+                {provider === 'beyond_presence'
+                  ? 'Start a real-time avatar session powered by Beyond Presence + LiveKit.'
+                  : `Have a conversation with your memory echo, powered by ${AI_PROVIDER_LABELS[provider]}.`}
+              </Text>
+              <Pressable style={styles.startBtn} onPress={startSession}>
+                <IconSymbol name={provider === 'beyond_presence' ? 'video.fill' : 'bubble.left.fill'} size={16} color={EchoColors.bg} />
+                <Text style={styles.startBtnText}>
+                  {provider === 'beyond_presence' ? 'Start avatar session' : 'Start chatting'}
+                </Text>
+              </Pressable>
+            </View>
+            {provider !== 'beyond_presence' && (
+              <View style={styles.idleBottom}>
+                <Text style={styles.suggestionsLabel}>Try asking…</Text>
+                <SuggestionChips onSelect={handleSuggestion} />
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ────────────────── CONNECTING ────────────────── */}
         {isConnecting && (
           <View style={styles.centeredState}>
-            <ActivityIndicator size="large" color={EchoColors.accent} />
-            <Text style={[styles.stateSub, { marginTop: 16 }]}>
-              Connecting to {AI_PROVIDER_LABELS[provider]}…
-            </Text>
+            <View style={styles.connectingRing}>
+              <View style={styles.echoAvatar}>
+                <Text style={styles.echoAvatarLetter}>E</Text>
+              </View>
+            </View>
+            <Text style={styles.stateSub}>Connecting to {AI_PROVIDER_LABELS[provider]}…</Text>
           </View>
         )}
 
+        {/* ────────────────── ERROR ────────────────── */}
         {isError && (
           <View style={styles.centeredState}>
-            <IconSymbol name="video.fill" size={40} color={EchoColors.error} />
-            <Text style={[styles.stateTitle, { color: EchoColors.error }]}>Error</Text>
-            <Text style={styles.stateSub}>{(state as { message: string }).message}</Text>
+            <IconSymbol name="xmark.circle.fill" size={44} color={EchoColors.error} />
+            <Text style={[styles.stateTitle, { color: EchoColors.error }]}>Connection failed</Text>
+            <Text style={[styles.stateSub, { color: EchoColors.textMuted }]}>
+              {(state as { message: string }).message}
+            </Text>
             <Pressable style={styles.startBtn} onPress={startSession}>
-              <Text style={styles.startBtnText}>Retry</Text>
+              <Text style={styles.startBtnText}>Try again</Text>
             </Pressable>
           </View>
         )}
 
-        {/* ── Beyond Presence: LiveKit viewport placeholder ── */}
+        {/* ────────────────── ACTIVE — LLM CHAT ────────────────── */}
+        {isLLM && (
+          <View style={{ flex: 1 }}>
+            <FlatList
+              ref={flatListRef}
+              data={timestampedMessages}
+              keyExtractor={(_, i) => String(i)}
+              renderItem={({ item }) => (
+                <MessageBubble
+                  message={item.message}
+                  timestamp={item.timestamp}
+                  onLongPress={() => handleLongPressBubble(item.message.content)}
+                />
+              )}
+              contentContainerStyle={styles.chatList}
+              showsVerticalScrollIndicator={false}
+              onContentSizeChange={scrollToBottom}
+              ListEmptyComponent={
+                <View style={styles.chatEmpty}>
+                  <Text style={styles.chatEmptyText}>Session started — say anything to your echo.</Text>
+                </View>
+              }
+              ListFooterComponent={isTyping ? <TypingIndicator /> : null}
+            />
+
+            {/* Suggestion row when no messages yet */}
+            {messages.length === 0 && !isTyping && (
+              <View style={styles.idleBottom}>
+                <Text style={styles.suggestionsLabel}>Try asking…</Text>
+                <SuggestionChips onSelect={handleSuggestion} />
+              </View>
+            )}
+
+            <ChatInputRow
+              value={inputText}
+              onChange={setInputText}
+              onSend={handleSend}
+              disabled={isTyping}
+            />
+          </View>
+        )}
+
+        {/* ────────────────── ACTIVE — BEYOND PRESENCE ────────────────── */}
         {isBP && livekitCreds && (
           <View style={{ flex: 1 }}>
-            <BPPlaceholder roomName={livekitCreds.roomName} />
-            {/* Caption bar */}
-            <View style={[styles.captionBar, { bottom: fabBottom + 72, left: horizontal + left, right: horizontal + right }]}>
-              <Text style={styles.captionText} numberOfLines={2}>
-                {latestAssistantMessage || 'Waiting for avatar…'}
+            {/* Video viewport */}
+            <View style={styles.bpViewport}>
+              <View style={styles.echoAvatar}>
+                <Text style={styles.echoAvatarLetter}>E</Text>
+              </View>
+              <Text style={styles.bpTitle}>Avatar connected</Text>
+              <Text style={styles.bpSub}>Room · {livekitCreds.roomName}</Text>
+              <Text style={[styles.bpSub, { color: EchoColors.accentWarm, marginTop: 4 }]}>
+                Install @livekit/react-native to render live video
               </Text>
             </View>
-            {/* Hold-to-talk */}
-            <View style={[styles.pttBtn, { bottom: fabBottom }]}>
+
+            {/* Caption bar */}
+            <View style={[styles.captionBar, {
+              bottom: fabBottom + 80,
+              left: horizontal + left,
+              right: horizontal + right,
+            }]}>
+              <Text style={styles.captionText} numberOfLines={3}>
+                {latestAssistantMessage || 'Listening…'}
+              </Text>
+            </View>
+
+            {/* PTT button */}
+            <Pressable
+              style={[styles.pttBtn, { bottom: fabBottom }]}
+              onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+              onPressOut={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
               <IconSymbol name="mic.fill" size={22} color={EchoColors.bg} />
               <Text style={styles.pttLabel}>Hold to talk</Text>
+            </Pressable>
+
+            {/* Text input for BP */}
+            <View style={[styles.bpTextPanelWrapper, { bottom: fabBottom + 60 }]}>
+              <BPTextPanel
+                value={bpInputText}
+                onChange={setBpInputText}
+                onSend={handleBPSend}
+                disabled={false}
+              />
             </View>
-            {/* Memory overlay pane (slides from right) */}
+
+            {/* Memory overlay */}
             <MemoryModePane
               isOpen={memoryOpen}
               memory={memory}
               onClose={closeMemory}
               rightOffset={horizontal + right}
-              bottomOffset={fabBottom + 72}
+              bottomOffset={fabBottom + 150}
             />
           </View>
         )}
 
-        {/* ── LLM: Chat interface ── */}
-        {isLLM && (
-          <View style={{ flex: 1 }}>
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              keyExtractor={(_, i) => String(i)}
-              renderItem={({ item }) => <MessageBubble message={item} />}
-              contentContainerStyle={styles.chatList}
-              showsVerticalScrollIndicator={false}
-              ListFooterComponent={
-                isTyping ? (
-                  <View style={[styles.bubble, styles.bubbleAssistant, styles.typingBubble]}>
-                    <Text style={styles.typingDots}>•••</Text>
-                  </View>
-                ) : null
-              }
-            />
-
-            {/* Input row */}
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Ask your echo…"
-                placeholderTextColor={EchoColors.textDim}
-                value={inputText}
-                onChangeText={setInputText}
-                onSubmitEditing={handleSend}
-                returnKeyType="send"
-                multiline={false}
-                editable={!isTyping}
-              />
-              <Pressable
-                style={[styles.sendBtn, (!inputText.trim() || isTyping) && styles.sendBtnDisabled]}
-                onPress={handleSend}
-                disabled={!inputText.trim() || isTyping}>
-                <IconSymbol name="paperplane.fill" size={18} color={EchoColors.bg} />
-              </Pressable>
-            </View>
-          </View>
-        )}
       </KeyboardAvoidingView>
-
-      {/* ── End session button ── */}
-      {isActive && (
-        <Pressable
-          style={[styles.endBtn, { top: top + 12, right: horizontal + right }]}
-          onPress={endSession}>
-          <Text style={styles.endBtnText}>End</Text>
-        </Pressable>
-      )}
     </ScreenContainer>
   );
 }
@@ -262,13 +604,8 @@ export default function PresenceScreen() {
 
 const styles = StyleSheet.create({
   // Provider picker
-  pickerWrap: {
-    paddingBottom: 12,
-  },
-  pickerRow: {
-    gap: 8,
-    paddingVertical: 4,
-  },
+  pickerWrap: { paddingBottom: 10 },
+  pickerRow: { gap: 8, paddingVertical: 4 },
   providerChip: {
     borderRadius: 20,
     paddingHorizontal: 16,
@@ -281,29 +618,74 @@ const styles = StyleSheet.create({
     backgroundColor: EchoColors.accent,
     borderColor: EchoColors.accent,
   },
-  providerChipText: {
-    color: EchoColors.textMuted,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  providerChipTextActive: {
-    color: EchoColors.bg,
-    fontWeight: '600',
-  },
+  providerChipText: { color: EchoColors.textMuted, fontSize: 14, fontWeight: '500' },
+  providerChipTextActive: { color: EchoColors.bg, fontWeight: '600' },
 
-  // State screens
-  centeredState: {
-    flex: 1,
+  // Session header
+  sessionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: EchoColors.border,
+    marginBottom: 8,
+  },
+  sessionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sessionHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: EchoColors.success,
+  },
+  sessionProvider: { color: EchoColors.text, fontSize: 14, fontWeight: '600' },
+  sessionModel: {
+    color: EchoColors.textDim,
+    fontSize: 12,
+    backgroundColor: EchoColors.bgElevated,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: EchoColors.border,
+  },
+  sessionTimer: { color: EchoColors.textDim, fontSize: 12, fontVariant: ['tabular-nums'] },
+  headerBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: EchoColors.bgElevated,
+    borderWidth: 1,
+    borderColor: EchoColors.border,
+  },
+  endBtnHeader: { borderColor: EchoColors.error + '55' },
+  endBtnText: { color: EchoColors.error, fontSize: 12, fontWeight: '600' },
+
+  // Echo avatar circle
+  echoAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: EchoColors.bgElevated,
+    borderWidth: 1,
+    borderColor: EchoColors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 12,
   },
-  stateTitle: {
+  echoAvatarLetter: {
     fontFamily: EchoFonts.serif,
     fontSize: 28,
     color: EchoColors.text,
-    marginTop: 8,
+  },
+
+  // Idle state
+  idleContainer: { flex: 1, justifyContent: 'space-between', paddingBottom: 8 },
+  idleTop: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 24 },
+  idleBottom: { gap: 8, paddingBottom: 4 },
+  stateTitle: {
+    fontFamily: EchoFonts.serif,
+    fontSize: 26,
+    color: EchoColors.text,
   },
   stateSub: {
     color: EchoColors.textMuted,
@@ -313,114 +695,100 @@ const styles = StyleSheet.create({
     maxWidth: 300,
   },
   startBtn: {
-    marginTop: 8,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 28,
-    backgroundColor: EchoColors.accent,
-  },
-  startBtnText: {
-    color: EchoColors.bg,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // Beyond Presence viewport
-  bpViewport: {
-    flex: 1,
-    backgroundColor: '#000',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    padding: 32,
-    marginBottom: 8,
-  },
-  bpTitle: {
-    fontFamily: EchoFonts.serif,
-    fontSize: 24,
-    color: EchoColors.text,
-  },
-  bpSub: {
-    color: EchoColors.textMuted,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-
-  // Caption + PTT
-  captionBar: {
-    position: 'absolute',
-    backgroundColor: 'rgba(10,10,11,0.88)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: EchoColors.border,
-  },
-  captionText: {
-    color: EchoColors.text,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  pttBtn: {
-    position: 'absolute',
-    alignSelf: 'center',
+    marginTop: 4,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 28,
-    height: 52,
-    borderRadius: 26,
+    paddingVertical: 14,
+    borderRadius: 28,
     backgroundColor: EchoColors.accent,
   },
-  pttLabel: {
-    color: EchoColors.bg,
+  startBtnText: { color: EchoColors.bg, fontSize: 16, fontWeight: '600' },
+
+  // Suggestions
+  suggestionsLabel: {
+    color: EchoColors.textDim,
+    fontSize: 12,
     fontWeight: '600',
-    fontSize: 15,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    paddingHorizontal: 4,
+  },
+  suggestionsRow: { gap: 8, paddingVertical: 4 },
+  suggestionChip: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: EchoColors.border,
+    backgroundColor: EchoColors.bgElevated,
+  },
+  suggestionText: { color: EchoColors.textMuted, fontSize: 13 },
+
+  // Connecting
+  centeredState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 16,
+  },
+  connectingRing: {
+    padding: 8,
+    borderRadius: 44,
+    borderWidth: 2,
+    borderColor: EchoColors.accent + '44',
+    borderStyle: 'dashed',
   },
 
-  // LLM chat
-  chatList: {
-    paddingBottom: 12,
-    gap: 8,
-  },
+  // Chat bubbles
+  chatList: { paddingBottom: 8, gap: 2 },
+  bubbleRow: { marginBottom: 4 },
+  bubbleRowUser: { alignItems: 'flex-end' },
+  bubbleRowAssistant: { alignItems: 'flex-start' },
   bubble: {
     maxWidth: '80%',
     borderRadius: 18,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
   },
   bubbleUser: {
-    alignSelf: 'flex-end',
     backgroundColor: EchoColors.accent,
     borderBottomRightRadius: 4,
   },
   bubbleAssistant: {
-    alignSelf: 'flex-start',
     backgroundColor: EchoColors.bgElevated,
     borderWidth: 1,
     borderColor: EchoColors.border,
     borderBottomLeftRadius: 4,
   },
-  bubbleText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  bubbleTextUser: {
-    color: EchoColors.bg,
-  },
-  bubbleTextAssistant: {
-    color: EchoColors.text,
-  },
+  bubbleText: { fontSize: 15, lineHeight: 22 },
+  bubbleTextUser: { color: EchoColors.bg },
+  bubbleTextAssistant: { color: EchoColors.text },
+  timestamp: { fontSize: 10, marginTop: 3, marginHorizontal: 6 },
+  timestampUser: { color: EchoColors.textDim, textAlign: 'right' },
+  timestampAssistant: { color: EchoColors.textDim },
+
+  // Typing indicator
   typingBubble: {
+    flexDirection: 'row',
+    gap: 5,
     paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
   },
-  typingDots: {
-    color: EchoColors.textMuted,
-    fontSize: 20,
-    letterSpacing: 4,
+  typingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: EchoColors.textMuted,
   },
+
+  // Empty chat
+  chatEmpty: { alignItems: 'center', paddingVertical: 24 },
+  chatEmptyText: { color: EchoColors.textDim, fontSize: 14, textAlign: 'center' },
 
   // Input row
   inputRow: {
@@ -435,12 +803,14 @@ const styles = StyleSheet.create({
     backgroundColor: EchoColors.bgElevated,
     borderRadius: 22,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
     color: EchoColors.text,
     fontSize: 15,
     borderWidth: 1,
     borderColor: EchoColors.border,
-    maxHeight: 100,
+    maxHeight: 120,
+    minHeight: 44,
   },
   sendBtn: {
     width: 44,
@@ -450,23 +820,65 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnDisabled: {
-    opacity: 0.4,
-  },
+  sendBtnDisabled: { backgroundColor: EchoColors.bgElevated, borderWidth: 1, borderColor: EchoColors.border },
 
-  // End session
-  endBtn: {
+  // BP viewport
+  bpViewport: {
+    flex: 1,
+    backgroundColor: '#000',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    padding: 32,
+    marginBottom: 8,
+  },
+  bpTitle: { fontFamily: EchoFonts.serif, fontSize: 22, color: EchoColors.text },
+  bpSub: { color: EchoColors.textMuted, fontSize: 14, textAlign: 'center' },
+
+  // Caption + PTT
+  captionBar: {
     position: 'absolute',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: EchoColors.bgElevated,
+    backgroundColor: 'rgba(10,10,11,0.92)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: EchoColors.border,
   },
-  endBtnText: {
-    color: EchoColors.error,
-    fontSize: 13,
-    fontWeight: '600',
+  captionText: { color: EchoColors.text, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  pttBtn: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 28,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: EchoColors.accent,
   },
+  pttLabel: { color: EchoColors.bg, fontWeight: '600', fontSize: 15 },
+
+  // BP text panel
+  bpTextPanelWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  bpTextPanel: {
+    backgroundColor: 'rgba(10,10,11,0.94)',
+    borderTopWidth: 1,
+    borderTopColor: EchoColors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  bpTextToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  bpTextToggleLabel: { color: EchoColors.textMuted, fontSize: 13, flex: 1 },
+  bpTextExpanded: {},
 });
