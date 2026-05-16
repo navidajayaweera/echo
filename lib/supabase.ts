@@ -41,12 +41,3 @@ export function getSupabase(): SupabaseClient {
 
   return client;
 }
-
-/** @deprecated Use getSupabase() — kept for gradual migration */
-export const supabase = new Proxy({} as SupabaseClient, {
-  get(_target, prop) {
-    const instance = getSupabase();
-    const value = instance[prop as keyof SupabaseClient];
-    return typeof value === 'function' ? value.bind(instance) : value;
-  },
-});

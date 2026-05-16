@@ -19,7 +19,7 @@ export function ScreenContainer({
   style,
   ...props
 }: ScreenContainerProps) {
-  const { top, bottom, left, right, screenPaddingTop, contentBottom, horizontal } =
+  const { bottom, left, right, screenPaddingTop, contentBottom, horizontal } =
     useAppInsets({ includeTabBar: includeTabBarPadding });
 
   const paddingTop = edges.includes('top') ? screenPaddingTop : 0;
