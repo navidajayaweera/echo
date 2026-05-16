@@ -35,6 +35,7 @@ export interface JournalRow {
   keywords: string[];
   memory_year: number | null;
   local_id: string | null;
+  is_embedded: boolean;
   sync_status: SyncStatus;
   created_at: string;
   updated_at: string;

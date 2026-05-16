@@ -2,7 +2,11 @@ import * as Network from 'expo-network';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { pullRemoteJournals, syncPendingJournals } from '@/lib/journal-sync';
+import {
+  pullRemoteJournals,
+  syncPendingJournals,
+  syncUnembeddedJournals,
+} from '@/lib/journal-sync';
 import { useAuth } from '@/providers/AuthProvider';
 
 export function useJournalSync(onSynced?: () => void): {
@@ -32,6 +36,7 @@ export function useJournalSync(onSynced?: () => void): {
           hasPulledRef.current = true;
         }
         await syncPendingJournals(user.id);
+        await syncUnembeddedJournals(user.id);
         setLastSyncAt(new Date().toISOString());
         onSyncedRef.current?.();
       } catch (err) {

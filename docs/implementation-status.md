@@ -15,9 +15,9 @@ Last updated: May 16, 2026
 ### Supabase Data Sync
 - `lib/supabase.ts` — Lazy-initialized client (prevents "supabaseUrl is required" crash before env vars load)
 - `lib/journal-storage.ts` — AsyncStorage journal cache (replaced MMKV)
-- `lib/journal-sync.ts` — `pullRemoteJournals` + `syncPendingJournals`
+- `lib/journal-sync.ts` — `pullRemoteJournals` + `syncPendingJournals` + automatic `embed-journal` triggers
 - `hooks/useJournalCache.ts` — Optimistic CRUD for journal entries
-- `hooks/useJournalSync.ts` — Background sync on foreground + network reconnect
+- `hooks/useJournalSync.ts` — Background sync on foreground + network reconnect + backfill for unembedded journals
 - `providers/JournalSyncProvider.tsx` — Singleton sync instance; exposes `isSyncing`, `lastSyncAt`, `syncError`
 
 ### UI System
@@ -72,16 +72,17 @@ Last updated: May 16, 2026
 - `stores/memory-overlay.store.ts` — `isOpen`, `memory` payload, `open()`/`close()`
 
 ### Database (Supabase)
-- `001_extensions.sql` — `uuid-ossp`, `sync_status` enum
+- `001_extensions.sql` — `uuid-ossp`, `vector`, `sync_status` enum
 - `002_core_tables.sql` — `profiles`, `journals`
 - `003_rls_and_triggers.sql` — RLS + `handle_new_user` trigger + `updated_at` triggers
 - `004_extend_tables.sql` — `bp_agent_id` on profiles, `is_embedded` on journals, `journal_embeddings`, `media_vault`, `echo_sessions`
 - `005_rls_extend.sql` — RLS for new tables
 - `006_vector_rpc.sql` — `match_memories()` cosine-similarity RPC
 - `007_storage_buckets.sql` — `media-vault` private bucket + per-user path policies
+- `008_ensure_vector_extension.sql` — Ensures `vector` extension exists on existing databases
 
 ### Edge Functions
-- `start-ai-session` — AI provider router (OpenAI / Gemini / Beyond Presence)
+- `start-ai-session` — AI provider router (OpenAI / Gemini / Beyond Presence) with semantic recall via `match_memories` + recency fallback
 - `embed-journal` — Journal chunking + OpenAI text-embedding-3-small + `journal_embeddings` upsert
 
 ---
@@ -91,8 +92,6 @@ Last updated: May 16, 2026
 | Item | Status | Notes |
 |------|--------|-------|
 | LiveKit RN SDK | Not installed | BP viewport shows placeholder; wire `@livekit/react-native` next |
-| `embed-journal` trigger | Manual call only | Not yet triggered automatically after journal sync |
-| `match_memories` usage | Defined, not called | Edge function currently uses raw journal text; swap to vector RPC |
 | `echo_sessions` end cleanup | Missing | No `ended_at` timestamp written on session end |
 
 ---
@@ -107,9 +106,7 @@ Last updated: May 16, 2026
 - [ ] Subscribe to avatar video track, display full-screen
 
 ### Priority 2 — Auto-embed pipeline
-- [ ] After `syncPendingJournals` succeeds, POST to `embed-journal` for unembedded entries
 - [ ] Poll `journals.is_embedded` and show embedding progress indicator
-- [ ] Switch `buildSystemPrompt` to use `match_memories` RPC with a query embedding instead of raw `LIMIT 10`
 
 ### Priority 3 — Transcript + session store
 - [ ] Wire `useSessionStore.appendTranscript` from AI message responses
