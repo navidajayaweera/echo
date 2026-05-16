@@ -13,6 +13,7 @@ function rowToCacheEntry(row: JournalRow): JournalCacheEntry {
     body: row.body,
     keywords: row.keywords?.length ? row.keywords : undefined,
     memoryYear: row.memory_year ?? undefined,
+    moodTag: row.mood_tag ?? undefined,
     pendingSync: false,
     remoteId: row.id,
     createdAt: row.created_at,
@@ -89,6 +90,7 @@ export async function syncPendingJournals(userId: string): Promise<number> {
           body: entry.body,
           keywords: entry.keywords ?? [],
           memory_year: entry.memoryYear ?? null,
+          mood_tag: entry.moodTag ?? null,
           sync_status: 'synced',
           updated_at: entry.updatedAt,
         },
@@ -108,6 +110,15 @@ export async function syncPendingJournals(userId: string): Promise<number> {
       remoteId: data.id,
       updatedAt: data.updated_at ?? entry.updatedAt,
     });
+
+    // Back-link any media_vault rows that were uploaded before the journal ID was known
+    if (entry.mediaVaultIds?.length && data.id) {
+      await supabase
+        .from('media_vault')
+        .update({ journal_id: data.id })
+        .in('id', entry.mediaVaultIds);
+    }
+
     syncedCount += 1;
   }
 

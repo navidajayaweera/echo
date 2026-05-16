@@ -1,8 +1,8 @@
-import * as ImagePicker from 'expo-image-picker';
+import { File } from 'expo-file-system';
 import { useCallback, useEffect, useState } from 'react';
 
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
-import type { MediaVaultRow, TimelineSection, UploadMediaPayload } from '@/lib/types/media-vault';
+import type { MediaVaultRow, TimelineSection } from '@/lib/types/media-vault';
 import { useAuth } from '@/providers/AuthProvider';
 
 const BUCKET = 'media-vault';
@@ -33,7 +33,6 @@ export function useTimeline() {
 
       if (fetchErr) throw fetchErr;
 
-      // Generate fresh signed URLs for items that don't have a cached public_url
       const rows = await Promise.all(
         (data ?? []).map(async (row: MediaVaultRow) => {
           if (row.public_url) return row;
@@ -58,7 +57,7 @@ export function useTimeline() {
 
       setSections(sectionsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load media');
+      setError(err instanceof Error ? err.message : 'Failed to load memories');
     } finally {
       setIsLoading(false);
     }
@@ -70,59 +69,53 @@ export function useTimeline() {
 
   // ── Upload ──────────────────────────────────────────────────────────────────
 
-  const pickAndUpload = useCallback(
-    async (memoryYear: number, title?: string) => {
+  const uploadMedia = useCallback(
+    async (payload: {
+      uri: string;
+      mimeType: string;
+      fileName: string;
+      mediaType: 'photo' | 'video' | 'voice' | 'letter' | 'document';
+      title?: string;
+      description?: string;
+      memoryYear: number;
+      memoryDate?: string;
+    }) => {
       if (!user || !isSupabaseConfigured) return;
 
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        setError('Media library permission denied');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images', 'videos'],
-        quality: 0.85,
-        allowsEditing: false,
-        exif: true,
-        base64: true,
-      });
-
-      if (result.canceled || !result.assets?.[0]) return;
-
-      const asset = result.assets[0];
       setIsUploading(true);
       setError(null);
 
       try {
         const supabase = getSupabase();
-        const ext = asset.uri.split('.').pop() ?? 'jpg';
-        const fileName = `${Date.now()}.${ext}`;
-        const storagePath = `${user.id}/${fileName}`;
-        const mimeType = asset.mimeType ?? `image/${ext}`;
+        const ext = payload.fileName.split('.').pop() ?? 'bin';
+        const storageName = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+        const storagePath = `${user.id}/${storageName}`;
 
-        if (!asset.base64) throw new Error('Could not read file data');
-        const byteArray = Uint8Array.from(atob(asset.base64), (c) => c.charCodeAt(0));
+        // Read file as base64 and convert to Uint8Array for upload
+        const fileRef = new File(payload.uri);
+        const base64 = await fileRef.base64();
+        const byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
         const { error: uploadErr } = await supabase.storage
           .from(BUCKET)
-          .upload(storagePath, byteArray, { contentType: mimeType, upsert: false });
+          .upload(storagePath, byteArray, {
+            contentType: payload.mimeType,
+            upsert: false,
+          });
 
         if (uploadErr) throw uploadErr;
 
-        const mediaType = mimeType.startsWith('video/') ? 'video' : 'photo';
-
         const { error: dbErr } = await supabase.from('media_vault').insert({
           user_id: user.id,
-          media_type: mediaType,
+          media_type: payload.mediaType,
           storage_path: storagePath,
-          title: title ?? asset.fileName ?? null,
-          memory_year: memoryYear,
+          title: payload.title ?? payload.fileName,
+          description: payload.description ?? null,
+          memory_year: payload.memoryYear,
+          memory_date: payload.memoryDate ?? null,
           metadata: {
-            width: asset.width,
-            height: asset.height,
-            duration: asset.duration ?? null,
-            mime: mimeType,
+            mime: payload.mimeType,
+            originalFileName: payload.fileName,
           },
         });
 
@@ -150,13 +143,16 @@ export function useTimeline() {
     [user, refresh],
   );
 
+  const totalCount = sections.reduce((n, s) => n + s.data.length, 0);
+
   return {
     sections,
+    totalCount,
     isLoading,
     isUploading,
     error,
     refresh,
-    pickAndUpload,
+    uploadMedia,
     deleteMedia,
   };
 }

@@ -1,14 +1,11 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EchoLayout } from '@/constants/echo-theme';
 
-/**
- * Consistent safe-area + tab bar spacing for screens and floating controls.
- */
+/** Safe-area + tab bar spacing; height matches `app/(tabs)/_layout.tsx`. */
 export function useAppInsets(options?: { includeTabBar?: boolean }) {
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = EchoLayout.tabBarBaseHeight + insets.bottom;
 
   const bottomInset = insets.bottom;
   const tabBar = options?.includeTabBar ? tabBarHeight : 0;

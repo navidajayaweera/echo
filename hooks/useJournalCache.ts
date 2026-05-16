@@ -29,6 +29,8 @@ export function useJournalCache() {
       body: string;
       keywords?: string[];
       memoryYear?: number;
+      moodTag?: string;
+      mediaVaultIds?: string[];
     }) => {
       const now = new Date().toISOString();
       const entry: JournalCacheEntry = {
@@ -37,6 +39,8 @@ export function useJournalCache() {
         body: input.body,
         keywords: input.keywords,
         memoryYear: input.memoryYear,
+        moodTag: input.moodTag,
+        mediaVaultIds: input.mediaVaultIds,
         pendingSync: true,
         createdAt: now,
         updatedAt: now,

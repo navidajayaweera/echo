@@ -10,6 +10,7 @@ export interface MediaVaultRow {
   title: string | null;
   description: string | null;
   memory_year: number;
+  memory_date: string | null;
   keywords: string[];
   metadata: Record<string, unknown>;
   created_at: string;
@@ -27,5 +28,7 @@ export interface UploadMediaPayload {
   fileName: string;
   mediaType: MediaType;
   title?: string;
+  description?: string;
   memoryYear: number;
+  memoryDate?: string;
 }

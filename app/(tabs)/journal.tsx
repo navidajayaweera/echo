@@ -6,8 +6,7 @@ import { JournalComposer } from '@/components/journal/JournalComposer';
 import { JournalEntryCard } from '@/components/journal/JournalEntryCard';
 import { JournalSearchBar } from '@/components/journal/JournalSearchBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { SectionHeader } from '@/components/ui/SectionHeader';
-import { EchoColors } from '@/constants/echo-theme';
+import { EchoColors, EchoFonts } from '@/constants/echo-theme';
 import { useAppInsets } from '@/hooks/use-app-insets';
 import { useJournalCache } from '@/hooks/useJournalCache';
 import { useJournalSyncContext } from '@/providers/JournalSyncProvider';
@@ -17,7 +16,7 @@ export default function JournalScreen() {
   const [search, setSearch] = useState('');
   const { entries, refresh, addEntry } = useJournalCache();
   const { isSyncing, lastSyncAt, syncError, runSync } = useJournalSyncContext();
-  const { contentBottom, fabBottom, horizontal, right } = useAppInsets({ includeTabBar: true });
+  const { contentBottom } = useAppInsets({ includeTabBar: true });
 
   useFocusEffect(
     useCallback(() => {
@@ -39,7 +38,8 @@ export default function JournalScreen() {
   const handleSave = async (input: {
     title?: string;
     body: string;
-    memoryYear?: number;
+    moodTag?: string;
+    mediaVaultIds?: string[];
   }) => {
     await addEntry(input);
     await runSync();
@@ -50,12 +50,30 @@ export default function JournalScreen() {
     ? 'Syncing…'
     : lastSyncAt
       ? `Synced ${new Date(lastSyncAt).toLocaleTimeString()}`
-      : 'Offline-first · syncs to cloud';
+      : 'Your memories, saved safely';
 
   return (
     <ScreenContainer includeTabBarPadding>
-      <SectionHeader title="Journal" subtitle={subtitle} />
+      {/* ── Header ── */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Journal</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+        </View>
+      </View>
+
       {syncError ? <Text style={styles.error}>{syncError}</Text> : null}
+
+      {/* ── Add button ── */}
+      <Pressable
+        style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
+        onPress={() => setComposerOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Remember something new">
+        <Text style={styles.addBtnIcon}>✏️</Text>
+        <Text style={styles.addBtnLabel}>Remember something…</Text>
+        <Text style={styles.addBtnArrow}>+</Text>
+      </Pressable>
 
       <JournalSearchBar value={search} onChangeText={setSearch} />
 
@@ -63,18 +81,18 @@ export default function JournalScreen() {
         data={filtered}
         keyExtractor={(item) => item.localId}
         renderItem={({ item }) => <JournalEntryCard entry={item} />}
-        contentContainerStyle={{ paddingBottom: contentBottom }}
+        contentContainerStyle={[styles.list, { paddingBottom: contentBottom }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <Text style={styles.empty}>No memories yet. Tap + to preserve one.</Text>
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyIcon}>📖</Text>
+            <Text style={styles.emptyTitle}>No memories yet</Text>
+            <Text style={styles.emptyHint}>
+              Tap the button above to write something you want to remember.
+            </Text>
+          </View>
         }
       />
-
-      <Pressable
-        style={[styles.fab, { bottom: fabBottom, right: horizontal + right }]}
-        onPress={() => setComposerOpen(true)}>
-        <Text style={styles.fabText}>+</Text>
-      </Pressable>
 
       <JournalComposer
         visible={composerOpen}
@@ -86,36 +104,84 @@ export default function JournalScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  title: {
+    fontFamily: EchoFonts.serif,
+    color: EchoColors.text,
+    fontSize: 34,
+    fontWeight: '300',
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    color: EchoColors.textDim,
+    fontSize: 13,
+    marginTop: 2,
+  },
   error: {
     color: EchoColors.error,
     fontSize: 13,
     marginBottom: 8,
   },
-  empty: {
-    color: EchoColors.textDim,
-    textAlign: 'center',
-    marginTop: 48,
-    fontSize: 16,
-    paddingHorizontal: 16,
-  },
-  fab: {
-    position: 'absolute',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: EchoColors.accent,
+  addBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 6,
+    backgroundColor: EchoColors.bgElevated,
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: EchoColors.border,
+    gap: 12,
   },
-  fabText: {
-    color: EchoColors.bg,
+  addBtnPressed: {
+    opacity: 0.75,
+    borderColor: EchoColors.accentWarm,
+  },
+  addBtnIcon: {
+    fontSize: 22,
+  },
+  addBtnLabel: {
+    flex: 1,
+    color: EchoColors.textMuted,
+    fontSize: 17,
+    fontWeight: '400',
+  },
+  addBtnArrow: {
+    color: EchoColors.accent,
     fontSize: 28,
     fontWeight: '300',
     lineHeight: 30,
+  },
+  list: {
+    paddingTop: 4,
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    paddingTop: 56,
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontFamily: EchoFonts.serif,
+    color: EchoColors.text,
+    fontSize: 22,
+    fontWeight: '300',
+  },
+  emptyHint: {
+    color: EchoColors.textMuted,
+    textAlign: 'center',
+    fontSize: 15,
+    lineHeight: 22,
   },
 });

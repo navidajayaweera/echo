@@ -46,6 +46,8 @@ export interface JournalCacheEntry {
   body: string;
   keywords?: string[];
   memoryYear?: number;
+  moodTag?: string;
+  mediaVaultIds?: string[];
   pendingSync: boolean;
   remoteId?: string;
   createdAt: string;
