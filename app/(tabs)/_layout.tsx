@@ -22,12 +22,13 @@ export default function TabLayout() {
           borderTopColor: EchoColors.border,
           borderTopWidth: StyleSheet.hairlineWidth,
           height: tabBarHeight,
-          paddingTop: 8,
-          paddingBottom: insets.bottom + 4,
-          paddingHorizontal: 8,
+          paddingTop: 12,
+          paddingBottom: Math.max(insets.bottom, 10) + 8,
+          paddingHorizontal: 4,
         },
         tabBarItemStyle: {
-          paddingVertical: 4,
+          minHeight: 52,
+          paddingVertical: 8,
         },
         headerShown: false,
         tabBarButton: HapticTab,
@@ -36,35 +37,35 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={30} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="journal"
         options={{
           title: 'Journal',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="book.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={30} name="book.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="presence"
         options={{
           title: 'Presence',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="video.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={30} name="video.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="timeline"
         options={{
           title: 'Timeline',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="clock.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={30} name="clock.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gearshape.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={30} name="gearshape.fill" color={color} />,
         }}
       />
     </Tabs>
@@ -73,12 +74,13 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-    marginBottom: Platform.OS === 'ios' ? 0 : 4,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    marginTop: 4,
+    marginBottom: Platform.OS === 'ios' ? 2 : 6,
   },
   tabIcon: {
-    marginBottom: 0,
+    marginBottom: 2,
   },
 });

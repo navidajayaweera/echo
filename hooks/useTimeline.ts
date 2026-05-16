@@ -71,9 +71,10 @@ export function useTimeline() {
 
   const uploadMedia = useCallback(
     async (payload: {
-      uri: string;
-      mimeType: string;
-      fileName: string;
+      uri?: string;             // undefined for text-only notes
+      mimeType?: string;
+      fileName?: string;
+      textContent?: string;     // populated for text notes (no file)
       mediaType: 'photo' | 'video' | 'voice' | 'letter' | 'document';
       title?: string;
       description?: string;
@@ -87,21 +88,27 @@ export function useTimeline() {
 
       try {
         const supabase = getSupabase();
-        const ext = payload.fileName.split('.').pop() ?? 'bin';
+        const isTextNote = !payload.uri && !!payload.textContent;
+
+        const ext = isTextNote ? 'txt' : (payload.fileName?.split('.').pop() ?? 'bin');
         const storageName = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
         const storagePath = `${user.id}/${storageName}`;
+        const mimeType = isTextNote ? 'text/plain' : (payload.mimeType ?? 'application/octet-stream');
 
-        // Read file as base64 and convert to Uint8Array for upload
-        const fileRef = new File(payload.uri);
-        const base64 = await fileRef.base64();
-        const byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        let byteArray: Uint8Array;
+        if (isTextNote) {
+          // Encode the note text as UTF-8 bytes so it lives in Storage and is
+          // retrievable by the AI embedding pipeline alongside other media.
+          byteArray = new TextEncoder().encode(payload.textContent!);
+        } else {
+          const fileRef = new File(payload.uri!);
+          const base64 = await fileRef.base64();
+          byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        }
 
         const { error: uploadErr } = await supabase.storage
           .from(BUCKET)
-          .upload(storagePath, byteArray, {
-            contentType: payload.mimeType,
-            upsert: false,
-          });
+          .upload(storagePath, byteArray, { contentType: mimeType, upsert: false });
 
         if (uploadErr) throw uploadErr;
 
@@ -109,13 +116,14 @@ export function useTimeline() {
           user_id: user.id,
           media_type: payload.mediaType,
           storage_path: storagePath,
-          title: payload.title ?? payload.fileName,
+          title: payload.title ?? (isTextNote ? 'Note' : (payload.fileName ?? null)),
           description: payload.description ?? null,
           memory_year: payload.memoryYear,
           memory_date: payload.memoryDate ?? null,
           metadata: {
-            mime: payload.mimeType,
-            originalFileName: payload.fileName,
+            mime: mimeType,
+            isNote: isTextNote,
+            originalFileName: payload.fileName ?? null,
           },
         });
 

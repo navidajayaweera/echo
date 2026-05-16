@@ -4,14 +4,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { EchoColors, EchoFonts } from '@/constants/echo-theme';
 import type { MediaType, MediaVaultRow } from '@/lib/types/media-vault';
 
-const MEDIA_ICON: Record<MediaType, string> = {
-  photo: 'photo.fill',
-  video: 'video.fill',
-  letter: 'envelope.fill',
-  voice: 'mic.fill',
-  document: 'doc.fill',
-};
-
 const MEDIA_EMOJI: Record<MediaType, string> = {
   photo: '🖼',
   video: '🎬',
@@ -40,6 +32,8 @@ interface Props {
 }
 
 export function TimelineItemCard({ item, onDelete }: Props) {
+  const isNote = item.metadata?.isNote === true;
+
   const handleDelete = () => {
     if (!onDelete) return;
     Alert.alert(
@@ -52,6 +46,38 @@ export function TimelineItemCard({ item, onDelete }: Props) {
     );
   };
 
+  // Text-note cards get a different, open-book style layout
+  if (isNote) {
+    return (
+      <View style={styles.noteCard}>
+        <View style={styles.noteHeader}>
+          <View style={styles.noteHeaderLeft}>
+            <Text style={styles.noteIcon}>📝</Text>
+            <Text style={styles.dateLabel}>{formatMemoryDate(item)}</Text>
+          </View>
+          {onDelete ? (
+            <Pressable
+              style={styles.deleteBtn}
+              onPress={handleDelete}
+              hitSlop={8}
+              accessibilityLabel="Delete this note">
+              <IconSymbol name="trash.fill" size={15} color={EchoColors.error} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {item.title ? (
+          <Text style={styles.noteTitle}>{item.title}</Text>
+        ) : null}
+
+        {item.description ? (
+          <Text style={styles.noteBody}>{item.description}</Text>
+        ) : null}
+      </View>
+    );
+  }
+
+  // Regular media card
   return (
     <View style={styles.card}>
       <View style={styles.iconBox}>
@@ -63,11 +89,11 @@ export function TimelineItemCard({ item, onDelete }: Props) {
           <Text style={styles.typeLabel}>{item.media_type}</Text>
           <Text style={styles.dateLabel}>{formatMemoryDate(item)}</Text>
         </View>
-        <Text style={styles.title} numberOfLines={2}>
+        <Text style={styles.title} numberOfLines={1}>
           {item.title ?? 'Untitled'}
         </Text>
         {item.description ? (
-          <Text style={styles.desc} numberOfLines={2}>
+          <Text style={styles.desc} numberOfLines={3}>
             {item.description}
           </Text>
         ) : null}
@@ -87,9 +113,10 @@ export function TimelineItemCard({ item, onDelete }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // ── Regular card ──────────────────────────────────────────────────────────
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: EchoColors.bgElevated,
     borderRadius: 14,
     borderWidth: 1,
@@ -108,19 +135,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: EchoColors.borderSubtle,
     flexShrink: 0,
+    marginTop: 2,
   },
-  mediaEmoji: {
-    fontSize: 24,
-  },
-  info: {
-    flex: 1,
-    gap: 4,
-  },
-  typeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  mediaEmoji: { fontSize: 24 },
+  info: { flex: 1, gap: 4 },
+  typeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   typeLabel: {
     color: EchoColors.accentWarm,
     fontSize: 10,
@@ -140,9 +159,10 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   desc: {
-    color: EchoColors.textDim,
-    fontSize: 13,
-    lineHeight: 18,
+    color: EchoColors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 2,
   },
   deleteBtn: {
     width: 36,
@@ -152,5 +172,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+
+  // ── Note card ─────────────────────────────────────────────────────────────
+  noteCard: {
+    backgroundColor: 'rgba(232,184,109,0.06)',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(232,184,109,0.25)',
+    marginBottom: 10,
+    padding: 16,
+    gap: 10,
+  },
+  noteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  noteHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  noteIcon: { fontSize: 16 },
+  noteTitle: {
+    fontFamily: EchoFonts.serif,
+    color: EchoColors.text,
+    fontSize: 17,
+    fontWeight: '400',
+    lineHeight: 24,
+  },
+  noteBody: {
+    color: EchoColors.textMuted,
+    fontSize: 15,
+    lineHeight: 23,
   },
 });

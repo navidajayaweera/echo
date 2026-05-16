@@ -34,5 +34,6 @@ export const EchoLayout = {
   contentBottomGap: 24,
   fabOffset: 16,
   maxContentWidth: 560,
-  tabBarBaseHeight: 56,
+  /** Must match visual tab bar height in `app/(tabs)/_layout.tsx`. */
+  tabBarBaseHeight: 84,
 } as const;

@@ -24,43 +24,59 @@ interface PickedAsset {
   fileName: string;
 }
 
-const TYPE_OPTIONS: { type: MediaType; icon: string; label: string; hint: string }[] = [
-  { type: 'photo', icon: '🖼', label: 'Photo', hint: 'A picture from your life' },
-  { type: 'video', icon: '🎬', label: 'Video', hint: 'A video clip or recording' },
-  { type: 'voice', icon: '🎙', label: 'Voice', hint: 'An audio recording' },
-  { type: 'letter', icon: '✉️', label: 'Letter', hint: 'A letter or written note' },
-  { type: 'document', icon: '📄', label: 'Document', hint: 'A document or PDF' },
+// 'note' is a UI-only type that maps to 'letter' in the DB
+type UIMediaType = MediaType | 'note';
+
+interface TypeOption {
+  uiType: UIMediaType;
+  dbType: MediaType;
+  icon: string;
+  label: string;
+  hint: string;
+  textOnly: boolean; // skips step 2 (no file picker)
+}
+
+const TYPE_OPTIONS: TypeOption[] = [
+  { uiType: 'note',     dbType: 'letter',   icon: '📝', label: `Write a Note`,  hint: ' ',   textOnly: true },
+  { uiType: 'photo',    dbType: 'photo',    icon: '🖼',  label: 'Photo',         hint: 'A picture from your life',    textOnly: false },
+  { uiType: 'video',    dbType: 'video',    icon: '🎬', label: 'Video',          hint: 'A video clip or recording',   textOnly: false },
+  { uiType: 'voice',    dbType: 'voice',    icon: '🎙', label: 'Voice',          hint: 'An audio recording',          textOnly: false },
+  { uiType: 'letter',   dbType: 'letter',   icon: '✉️', label: 'Letter / Scan',  hint: 'A scanned letter or note',    textOnly: false },
+  { uiType: 'document', dbType: 'document', icon: '📄', label: 'Document',       hint: 'A document or PDF',           textOnly: false },
 ];
+
+interface UploadPayload {
+  uri?: string;           // undefined for text-only notes
+  mimeType?: string;
+  fileName?: string;
+  textContent?: string;   // populated for notes
+  mediaType: MediaType;
+  title?: string;
+  description?: string;
+  memoryDate: string;
+  memoryYear: number;
+}
 
 interface Props {
   isUploading: boolean;
-  onUpload: (payload: {
-    uri: string;
-    mimeType: string;
-    fileName: string;
-    mediaType: MediaType;
-    title?: string;
-    description?: string;
-    memoryDate: string;
-    memoryYear: number;
-  }) => Promise<void>;
+  onUpload: (payload: UploadPayload) => Promise<void>;
 }
 
 export function MediaUploadWizard({ isUploading, onUpload }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [step, setStep] = useState<Step>(1);
-  const [mediaType, setMediaType] = useState<MediaType | null>(null);
+  const [selectedOption, setSelectedOption] = useState<TypeOption | null>(null);
   const [asset, setAsset] = useState<PickedAsset | null>(null);
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [storyText, setStoryText] = useState('');  // primary text / description
   const [memoryDate, setMemoryDate] = useState(new Date().toISOString().slice(0, 10));
 
   const reset = () => {
     setStep(1);
-    setMediaType(null);
+    setSelectedOption(null);
     setAsset(null);
     setTitle('');
-    setDescription('');
+    setStoryText('');
     setMemoryDate(new Date().toISOString().slice(0, 10));
   };
 
@@ -69,20 +85,25 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
     setModalOpen(false);
   };
 
-  const selectType = (t: MediaType) => {
-    setMediaType(t);
-    setStep(2);
+  const selectType = (opt: TypeOption) => {
+    setSelectedOption(opt);
+    if (opt.textOnly) {
+      // Text note — skip file picking, go directly to details
+      setStep(3);
+    } else {
+      setStep(2);
+    }
   };
 
   const pickFile = async () => {
-    if (!mediaType) return;
+    if (!selectedOption) return;
 
-    if (mediaType === 'photo' || mediaType === 'video') {
+    if (selectedOption.uiType === 'photo' || selectedOption.uiType === 'video') {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) return;
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: mediaType === 'photo' ? ['images'] : ['videos'],
+        mediaTypes: selectedOption.uiType === 'photo' ? ['images'] : ['videos'],
         quality: 0.85,
         base64: false,
       });
@@ -90,8 +111,8 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
       const a = result.assets[0];
       setAsset({
         uri: a.uri,
-        mimeType: a.mimeType ?? (mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
-        fileName: a.fileName ?? `${mediaType}_${Date.now()}`,
+        mimeType: a.mimeType ?? (selectedOption.uiType === 'video' ? 'video/mp4' : 'image/jpeg'),
+        fileName: a.fileName ?? `${selectedOption.uiType}_${Date.now()}`,
       });
     } else {
       const mimeMap: Record<string, string> = {
@@ -100,7 +121,7 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
         document: 'application/pdf',
       };
       const result = await DocumentPicker.getDocumentAsync({
-        type: mimeMap[mediaType] ?? '*/*',
+        type: mimeMap[selectedOption.uiType] ?? '*/*',
         copyToCacheDirectory: true,
       });
       if (result.canceled || !result.assets?.[0]) return;
@@ -115,18 +136,31 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
   };
 
   const handleSave = async () => {
-    if (!asset || !mediaType) return;
+    if (!selectedOption) return;
+    const isNote = selectedOption.textOnly;
+    if (!isNote && !asset) return;
+    if (isNote && !storyText.trim()) return;
+
     const year = parseInt(memoryDate.slice(0, 4), 10);
-    await onUpload({
-      uri: asset.uri,
-      mimeType: asset.mimeType,
-      fileName: asset.fileName,
-      mediaType,
+    const payload: UploadPayload = {
+      mediaType: selectedOption.dbType,
       title: title.trim() || undefined,
-      description: description.trim() || undefined,
+      description: storyText.trim() || undefined,
       memoryDate,
       memoryYear: isNaN(year) ? new Date().getFullYear() : year,
-    });
+    };
+
+    if (isNote) {
+      payload.textContent = storyText.trim();
+      payload.mimeType = 'text/plain';
+      payload.fileName = `note_${Date.now()}.txt`;
+    } else if (asset) {
+      payload.uri = asset.uri;
+      payload.mimeType = asset.mimeType;
+      payload.fileName = asset.fileName;
+    }
+
+    await onUpload(payload);
     close();
   };
 
@@ -142,6 +176,9 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
     const capped = d > new Date() ? new Date() : d;
     setMemoryDate(capped.toISOString().slice(0, 10));
   };
+
+  const isNote = selectedOption?.textOnly ?? false;
+  const canSave = isNote ? storyText.trim().length > 0 : !!asset;
 
   return (
     <>
@@ -164,33 +201,51 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
       <Modal visible={modalOpen} animationType="slide" transparent onRequestClose={close}>
         <Pressable style={styles.backdrop} onPress={close} />
         <View style={styles.sheet}>
-          {/* Step indicator */}
+          {/* Step indicator — only show 2 steps for notes, 3 for files */}
           <View style={styles.stepRow}>
-            {([1, 2, 3] as Step[]).map((n, i) => (
-              <View key={n} style={styles.stepItem}>
-                <View style={[styles.stepDot, step >= n && styles.stepDotActive]}>
-                  <Text style={[styles.stepNum, step >= n && styles.stepNumActive]}>{n}</Text>
+            {([1, 2, 3] as Step[]).map((n, i) => {
+              const isSkipped = isNote && n === 2;
+              return (
+                <View key={n} style={styles.stepItem}>
+                  <View
+                    style={[
+                      styles.stepDot,
+                      step >= n && !isSkipped && styles.stepDotActive,
+                      isSkipped && styles.stepDotSkipped,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.stepNum,
+                        step >= n && !isSkipped && styles.stepNumActive,
+                      ]}>
+                      {n}
+                    </Text>
+                  </View>
+                  {i < 2 ? (
+                    <View
+                      style={[styles.stepLine, step > n && !isSkipped && styles.stepLineActive]}
+                    />
+                  ) : null}
                 </View>
-                {i < 2 ? (
-                  <View style={[styles.stepLine, step > n && styles.stepLineActive]} />
-                ) : null}
-              </View>
-            ))}
+              );
+            })}
           </View>
 
+          {/* ── Step 1: Choose type ── */}
           {step === 1 && (
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.heading}>What kind of memory?</Text>
               <View style={styles.typeGrid}>
                 {TYPE_OPTIONS.map((opt) => (
                   <Pressable
-                    key={opt.type}
+                    key={opt.uiType}
                     style={({ pressed }) => [
                       styles.typeCard,
-                      mediaType === opt.type && styles.typeCardActive,
+                      selectedOption?.uiType === opt.uiType && styles.typeCardActive,
                       pressed && styles.typeCardPressed,
+                      opt.textOnly && styles.typeCardNote,
                     ]}
-                    onPress={() => selectType(opt.type)}
+                    onPress={() => selectType(opt)}
                     accessibilityRole="button"
                     accessibilityLabel={opt.label}>
                     <Text style={styles.typeIcon}>{opt.icon}</Text>
@@ -205,15 +260,13 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
             </ScrollView>
           )}
 
-          {step === 2 && mediaType && (
+          {/* ── Step 2: Pick file (skipped for notes) ── */}
+          {step === 2 && selectedOption && !selectedOption.textOnly && (
             <View style={styles.stepContent}>
               <Text style={styles.heading}>
-                {TYPE_OPTIONS.find((o) => o.type === mediaType)?.icon}{' '}
-                {TYPE_OPTIONS.find((o) => o.type === mediaType)?.label}
+                {selectedOption.icon}  {selectedOption.label}
               </Text>
-              <Text style={styles.pickHint}>
-                Tap below to choose a file from your device.
-              </Text>
+              <Text style={styles.pickHint}>Tap below to choose a file from your device.</Text>
               <Pressable
                 style={({ pressed }) => [styles.pickBtn, pressed && { opacity: 0.75 }]}
                 onPress={pickFile}
@@ -228,30 +281,51 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
             </View>
           )}
 
-          {step === 3 && asset && (
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <Text style={styles.heading}>Add details</Text>
+          {/* ── Step 3: Details (title, story, date) ── */}
+          {step === 3 && (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled">
+              <Text style={styles.heading}>
+                {isNote ? '📝  Write your memory' : 'Add details'}
+              </Text>
 
-              <Text style={styles.fieldLabel}>Title</Text>
+              {/* Story / Notes — PRIMARY field, always shown first and large */}
+              <Text style={styles.fieldLabel}>
+                {isNote ? 'Your memory' : 'Write about this'}
+              </Text>
+              <TextInput
+                style={[styles.input, styles.storyInput]}
+                placeholder={
+                  isNote
+                    ? 'Write a memory, story, or something important to remember…'
+                    : 'What do you remember about this? Where were you? Who was there?'
+                }
+                placeholderTextColor={EchoColors.textDim}
+                value={storyText}
+                onChangeText={setStoryText}
+                multiline
+                textAlignVertical="top"
+                autoFocus={isNote}
+              />
+
+              {/* Title — secondary for notes, primary for files */}
+              <Text style={styles.fieldLabel}>
+                {isNote ? 'Title (optional)' : 'Title'}
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder={`${TYPE_OPTIONS.find((o) => o.type === mediaType)?.label ?? 'Memory'} title…`}
+                placeholder={
+                  isNote
+                    ? 'Give this memory a name…'
+                    : `${selectedOption?.label ?? 'Memory'} title…`
+                }
                 placeholderTextColor={EchoColors.textDim}
                 value={title}
                 onChangeText={setTitle}
               />
 
-              <Text style={styles.fieldLabel}>Description (optional)</Text>
-              <TextInput
-                style={[styles.input, styles.descInput]}
-                placeholder="What do you remember about this?"
-                placeholderTextColor={EchoColors.textDim}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                textAlignVertical="top"
-              />
-
+              {/* Date stepper */}
               <Text style={styles.fieldLabel}>When was this?</Text>
               <View style={styles.dateRow}>
                 <Pressable style={styles.dateStepper} onPress={() => adjustDate(-1)}>
@@ -270,13 +344,15 @@ export function MediaUploadWizard({ isUploading, onUpload }: Props) {
               <Text style={styles.dateHint}>Use ‹ › to go back or forward one day</Text>
 
               <View style={styles.stepActions}>
-                <Pressable style={styles.cancelBtn} onPress={() => setStep(2)}>
+                <Pressable
+                  style={styles.cancelBtn}
+                  onPress={() => setStep(isNote ? 1 : 2)}>
                   <Text style={styles.cancelText}>← Back</Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.saveBtn, isUploading && styles.saveBtnDisabled]}
+                  style={[styles.saveBtn, (!canSave || isUploading) && styles.saveBtnDisabled]}
                   onPress={handleSave}
-                  disabled={isUploading}>
+                  disabled={!canSave || isUploading}>
                   {isUploading ? (
                     <ActivityIndicator size="small" color={EchoColors.bg} />
                   ) : (
@@ -307,9 +383,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     backgroundColor: EchoColors.bgElevated,
   },
-  triggerDisabled: {
-    opacity: 0.5,
-  },
+  triggerDisabled: { opacity: 0.5 },
   triggerIcon: {
     color: EchoColors.accentWarm,
     fontSize: 28,
@@ -332,7 +406,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingHorizontal: 24,
     paddingBottom: Platform.OS === 'ios' ? 40 : 28,
-    maxHeight: '88%',
+    maxHeight: '92%',
     borderTopWidth: 1,
     borderColor: EchoColors.border,
   },
@@ -341,7 +415,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
-    gap: 0,
   },
   stepItem: {
     flexDirection: 'row',
@@ -357,6 +430,9 @@ const styles = StyleSheet.create({
   },
   stepDotActive: {
     backgroundColor: EchoColors.accentWarm,
+  },
+  stepDotSkipped: {
+    opacity: 0.3,
   },
   stepNum: {
     color: EchoColors.textDim,
@@ -399,16 +475,22 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 6,
   },
+  // "Write a Note" spans full width at the top
+  typeCardNote: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 20,
+    borderColor: EchoColors.accentWarm,
+    backgroundColor: 'rgba(232,184,109,0.06)',
+  },
   typeCardActive: {
     borderColor: EchoColors.accentWarm,
-    backgroundColor: 'rgba(232,184,109,0.08)',
+    backgroundColor: 'rgba(232,184,109,0.1)',
   },
-  typeCardPressed: {
-    opacity: 0.75,
-  },
-  typeIcon: {
-    fontSize: 28,
-  },
+  typeCardPressed: { opacity: 0.75 },
+  typeIcon: { fontSize: 28 },
   typeLabel: {
     color: EchoColors.text,
     fontSize: 16,
@@ -419,9 +501,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
-  stepContent: {
-    gap: 12,
-  },
+  stepContent: { gap: 12 },
   pickHint: {
     color: EchoColors.textMuted,
     fontSize: 15,
@@ -451,15 +531,20 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: EchoColors.bg,
     borderRadius: 12,
-    padding: 14,
+    padding: 16,
     color: EchoColors.text,
     fontSize: 16,
     borderWidth: 1,
     borderColor: EchoColors.border,
     marginBottom: 4,
   },
-  descInput: {
-    minHeight: 80,
+  // Story / notes field — large, prominent, easy to read/write
+  storyInput: {
+    minHeight: 160,
+    fontSize: 17,
+    lineHeight: 26,
+    borderColor: EchoColors.accentWarm,
+    borderWidth: 1.5,
   },
   dateRow: {
     flexDirection: 'row',
@@ -468,8 +553,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   dateStepper: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: 12,
     backgroundColor: EchoColors.bg,
     borderWidth: 1,
@@ -479,12 +564,12 @@ const styles = StyleSheet.create({
   },
   dateStepperText: {
     color: EchoColors.text,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '300',
   },
   dateDisplay: {
     flex: 1,
-    height: 48,
+    height: 52,
     backgroundColor: EchoColors.bg,
     borderRadius: 12,
     borderWidth: 1,
@@ -529,9 +614,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: EchoColors.accent,
   },
-  saveBtnDisabled: {
-    opacity: 0.45,
-  },
+  saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: {
     color: EchoColors.bg,
     fontSize: 16,
