@@ -1,7 +1,8 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
-import { embedQueryText } from '../_shared/gemini-embeddings.ts';
 import { createAdminClient, verifyUser } from '../_shared/supabase-admin.ts';
 import { buildSystemPrompt } from '../_shared/build-system-prompt.ts';
+import { resolveMemoriesForPrompt } from '../_shared/load-prompt-memories.ts';
+import { refreshAvatarKnowledge } from '../_shared/refresh-avatar-knowledge.ts';
 import { BeyondPresenceProvider } from '../_shared/providers/beyond-presence.ts';
 import { GeminiProvider } from '../_shared/providers/gemini.ts';
 import { OpenAIProvider } from '../_shared/providers/openai.ts';
@@ -12,23 +13,15 @@ import type {
   StartSessionRequest,
 } from '../_shared/providers/types.ts';
 
-// ── Provider registry — add new providers here only ──────────────────────────
 const PROVIDERS: Record<ProviderName, AIProvider> = {
   beyond_presence: new BeyondPresenceProvider(),
   openai: new OpenAIProvider(),
   gemini: new GeminiProvider(),
 };
 
-type PromptMemory = {
-  title: string | null;
-  body: string;
-  memory_year: number | null;
-  created_at: string;
-};
-
 function getMemoryQuery(messages: ChatMessage[] | undefined): string {
   if (!messages || messages.length === 0) {
-    return 'important personal memories and life experiences';
+    return 'important personal memories family names places stories to help remember';
   }
 
   for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -37,95 +30,42 @@ function getMemoryQuery(messages: ChatMessage[] | undefined): string {
     }
   }
 
-  return 'important personal memories and life experiences';
+  return 'important personal memories family names places stories to help remember';
 }
 
-async function loadRecentMemories(
-  supabase: ReturnType<typeof createAdminClient>,
-  userId: string,
-): Promise<PromptMemory[]> {
-  const { data: memories } = await supabase
-    .from('journals')
-    .select('title, body, memory_year, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(10);
-
-  return (memories ?? []) as PromptMemory[];
-}
-
-async function loadSemanticMemories(
-  supabase: ReturnType<typeof createAdminClient>,
-  userId: string,
-  queryText: string,
-): Promise<PromptMemory[]> {
-  const embedding = await embedQueryText(queryText);
-
-  const { data, error } = await supabase.rpc('match_memories', {
-    query_embedding: JSON.stringify(embedding),
-    match_user_id: userId,
-    match_count: 8,
-    match_threshold: 0.72,
-  });
-
-  if (error) {
-    throw new Error(`match_memories RPC failed: ${error.message}`);
-  }
-
-  if (!data || data.length === 0) {
-    return [];
-  }
-
-  const now = new Date().toISOString();
-  return (data as Array<{ chunk_text: string; memory_year: number | null }>).map((item) => ({
-    title: null,
-    body: item.chunk_text,
-    memory_year: item.memory_year,
-    created_at: now,
-  }));
-}
-
-// ── Handler ───────────────────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
   try {
-    // 1. Auth
     const user = await verifyUser(req.headers.get('Authorization'));
 
-    // 2. Parse body
     const body: StartSessionRequest = await req.json();
     const { provider: providerName, messages, persona_overrides } = body;
 
     if (!providerName || !(providerName in PROVIDERS)) {
-      return json({ error: `Unknown provider "${providerName}". Valid: ${Object.keys(PROVIDERS).join(', ')}` }, 400);
+      return json({
+        error: `Unknown provider "${providerName}". Valid: ${Object.keys(PROVIDERS).join(', ')}`,
+      }, 400);
     }
 
-    // 3. Load profile + memory context for system prompt
     const supabase = createAdminClient();
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('display_name, persona_traits')
+      .select('display_name, persona_traits, bp_agent_id')
       .eq('id', user.id)
       .maybeSingle();
 
     const queryText = getMemoryQuery(messages);
-    let memories: PromptMemory[] = [];
-
-    try {
-      const semanticMemories = await loadSemanticMemories(supabase, user.id, queryText);
-      memories = semanticMemories.length > 0
-        ? semanticMemories
-        : await loadRecentMemories(supabase, user.id);
-    } catch (err) {
-      console.warn('[start-ai-session] semantic memory lookup failed, using recency fallback:', err);
-      memories = await loadRecentMemories(supabase, user.id);
-    }
+    const memories = await resolveMemoriesForPrompt(supabase, user.id, queryText);
 
     const personaTraits = {
-      humor: 50, warmth: 70, wisdom: 60, verbosity: 40, formality: 30,
+      humor: 50,
+      warmth: 85,
+      wisdom: 70,
+      verbosity: 35,
+      formality: 25,
       ...(profile?.persona_traits ?? {}),
       ...(persona_overrides ?? {}),
     };
@@ -136,11 +76,19 @@ Deno.serve(async (req: Request) => {
       memories,
     );
 
-    // 4. Delegate to provider
     const provider = PROVIDERS[providerName];
-    const result = await provider.run(body, systemPrompt);
+    const result = await provider.run(body, systemPrompt, {
+      bpAgentId: profile?.bp_agent_id ?? null,
+    });
 
-    // 5. Log session (best-effort, non-blocking)
+    if (providerName === 'beyond_presence' && 'agentId' in result && result.agentId) {
+      supabase
+        .from('profiles')
+        .update({ bp_agent_id: result.agentId })
+        .eq('id', user.id)
+        .then(() => {});
+    }
+
     if (providerName === 'beyond_presence' && 'livekit' in result) {
       supabase
         .from('echo_sessions')

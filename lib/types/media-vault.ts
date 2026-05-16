@@ -12,6 +12,7 @@ export interface MediaVaultRow {
   memory_year: number;
   memory_date: string | null;
   keywords: string[];
+  is_embedded: boolean;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;

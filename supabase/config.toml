@@ -44,3 +44,12 @@ verify_jwt = true
 
 [functions.embed-journal]
 verify_jwt = true
+
+[functions.embed-memory]
+verify_jwt = true
+
+[functions.refresh-avatar-knowledge]
+verify_jwt = true
+
+[functions.list-bey-avatars]
+verify_jwt = true

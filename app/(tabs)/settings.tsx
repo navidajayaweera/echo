@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BeyAvatarSection } from '@/components/settings/BeyAvatarSection';
 import { ConnectionChecklist } from '@/components/settings/ConnectionChecklist';
 import { PersonaSlider } from '@/components/settings/PersonaSlider';
 import { EchoTextInput } from '@/components/ui/EchoTextInput';
@@ -138,6 +139,12 @@ export default function SettingsScreen() {
             autoCapitalize="words"
           />
         </View>
+
+        <BeyAvatarSection
+          profile={profile}
+          isAnonymous={isAnonymous}
+          updateProfile={updateProfile}
+        />
 
         <View style={styles.block}>
           <Text style={styles.blockTitle}>Persona engine</Text>

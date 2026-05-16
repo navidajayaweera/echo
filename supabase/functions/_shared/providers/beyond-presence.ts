@@ -1,73 +1,69 @@
-// @ts-ignore — Deno import
-import { AccessToken } from 'https://esm.sh/livekit-server-sdk@2';
-
 import type {
   AIProvider,
   BeyondPresenceSessionResult,
-  PersonaTraits,
+  ProviderRunOptions,
   StartSessionRequest,
 } from './types.ts';
+
+const BEY_BASE = 'https://api.bey.dev';
 
 export class BeyondPresenceProvider implements AIProvider {
   readonly name = 'beyond_presence' as const;
 
   async run(
-    req: StartSessionRequest,
-    systemPrompt: string,
+    _req: StartSessionRequest,
+    _systemPrompt: string,
+    options?: ProviderRunOptions,
   ): Promise<BeyondPresenceSessionResult> {
-    const bpApiKey = Deno.env.get('BEYOND_PRESENCE_API_KEY');
-    const lkApiKey = Deno.env.get('LIVEKIT_API_KEY');
-    const lkApiSecret = Deno.env.get('LIVEKIT_API_SECRET');
-    const lkUrl = Deno.env.get('LIVEKIT_URL');
+    const bpApiKey = Deno.env.get('BEY_API_KEY');
 
-    if (!bpApiKey || !lkApiKey || !lkApiSecret || !lkUrl) {
+    if (!bpApiKey) {
       throw new Error(
-        'Missing Beyond Presence / LiveKit secrets. Set BEYOND_PRESENCE_API_KEY, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_URL.',
+        'BEY_API_KEY secret is not set. Run: npx supabase secrets set BEY_API_KEY=<your_key>',
       );
     }
 
-    // 1. Create session with Beyond Presence API
-    const bpResponse = await fetch('https://api.beyondpresence.ai/v1/sessions', {
+    if (!options?.bpAgentId) {
+      throw new Error(
+        'No Beyond Presence agent exists for this user yet. Upload journals or memories first to train the avatar, then retry.',
+      );
+    }
+
+    const callRes = await fetch(`${BEY_BASE}/v1/calls`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${bpApiKey}`,
+        'x-api-key': bpApiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        system_prompt: systemPrompt,
-        persona: req.persona_overrides ?? {},
+        agent_id: options.bpAgentId,
+        livekit_username: 'User',
       }),
     });
 
-    if (!bpResponse.ok) {
-      const err = await bpResponse.text();
-      throw new Error(`Beyond Presence error ${bpResponse.status}: ${err}`);
+    if (!callRes.ok) {
+      const err = await callRes.text();
+      throw new Error(`Beyond Presence call error ${callRes.status}: ${err}`);
     }
 
-    const bpData = await bpResponse.json();
-    const agentId: string = bpData.agent_id ?? bpData.id;
-    const roomName: string = bpData.room_name ?? `echo-${crypto.randomUUID()}`;
-
-    // 2. Mint a LiveKit participant token for the mobile client
-    const participantIdentity = `user-${crypto.randomUUID()}`;
-    const at = new AccessToken(lkApiKey, lkApiSecret, {
-      identity: participantIdentity,
-      ttl: '2h',
-    });
-    at.addGrant({
-      roomJoin: true,
-      room: roomName,
-      canPublish: true,
-      canSubscribe: true,
-    });
-
-    const token = await at.toJwt();
+    const data = await callRes.json() as {
+      id: string;
+      agent_id: string;
+      livekit_url: string;
+      livekit_token: string;
+      started_at: string;
+      ended_at: string | null;
+    };
 
     return {
       provider: 'beyond_presence',
-      livekit: { token, wsUrl: lkUrl, roomName },
-      sessionId: crypto.randomUUID(),
-      agentId,
+      livekit: {
+        wsUrl: data.livekit_url,
+        token: data.livekit_token,
+        roomName: data.id,
+      },
+      sessionId: data.id,
+      agentId: data.agent_id,
     };
   }
 }

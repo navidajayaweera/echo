@@ -107,8 +107,8 @@ export function BeyondPresenceIdle({
           Your Personal Avatar
         </Text>
         <Text style={styles.description} allowFontScaling={false}>
-          Speak naturally. Your avatar will listen, remember, and respond with
-          familiar stories and warm memories.
+          A gentle companion for someone with dementia — helping them recall
+          names, places, and stories from the memories you have shared.
         </Text>
       </View>
 

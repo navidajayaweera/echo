@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 import { useCallback, useEffect, useState } from 'react';
 
+import { feedMemoryToAvatar } from '@/lib/avatar-feed';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { MediaVaultRow, TimelineSection } from '@/lib/types/media-vault';
 import { useAuth } from '@/providers/AuthProvider';
@@ -112,22 +113,30 @@ export function useTimeline() {
 
         if (uploadErr) throw uploadErr;
 
-        const { error: dbErr } = await supabase.from('media_vault').insert({
-          user_id: user.id,
-          media_type: payload.mediaType,
-          storage_path: storagePath,
-          title: payload.title ?? (isTextNote ? 'Note' : (payload.fileName ?? null)),
-          description: payload.description ?? null,
-          memory_year: payload.memoryYear,
-          memory_date: payload.memoryDate ?? null,
-          metadata: {
-            mime: mimeType,
-            isNote: isTextNote,
-            originalFileName: payload.fileName ?? null,
-          },
-        });
+        const { data: inserted, error: dbErr } = await supabase
+          .from('media_vault')
+          .insert({
+            user_id: user.id,
+            media_type: payload.mediaType,
+            storage_path: storagePath,
+            title: payload.title ?? (isTextNote ? 'Note' : (payload.fileName ?? null)),
+            description: payload.description ?? null,
+            memory_year: payload.memoryYear,
+            memory_date: payload.memoryDate ?? null,
+            metadata: {
+              mime: mimeType,
+              isNote: isTextNote,
+              originalFileName: payload.fileName ?? null,
+            },
+          })
+          .select('id')
+          .single();
 
         if (dbErr) throw dbErr;
+
+        if (inserted?.id) {
+          await feedMemoryToAvatar(inserted.id);
+        }
 
         await refresh();
       } catch (err) {

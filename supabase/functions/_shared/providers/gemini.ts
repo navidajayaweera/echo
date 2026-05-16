@@ -10,7 +10,11 @@ const DEFAULT_MODEL = 'gemini-1.5-flash';
 export class GeminiProvider implements AIProvider {
   readonly name = 'gemini' as const;
 
-  async run(req: StartSessionRequest, systemPrompt: string): Promise<LLMSessionResult> {
+  async run(
+    req: StartSessionRequest,
+    systemPrompt: string,
+    _options?: import('./types.ts').ProviderRunOptions,
+  ): Promise<LLMSessionResult> {
     const apiKey = Deno.env.get('GEMINI_API_KEY');
     if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
 

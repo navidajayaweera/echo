@@ -34,7 +34,9 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   continueAsGuest: () => Promise<void>;
   updateProfile: (
-    partial: Partial<Pick<Profile, 'display_name' | 'avatar_url' | 'persona_traits'>>
+    partial: Partial<
+      Pick<Profile, 'display_name' | 'avatar_url' | 'persona_traits' | 'bp_avatar_id'>
+    >
   ) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -55,6 +57,7 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
 function normalizeProfile(row: Profile): Profile {
   return {
     ...row,
+    bp_avatar_id: row.bp_avatar_id ?? null,
     persona_traits: {
       ...DEFAULT_PERSONA_TRAITS,
       ...(row.persona_traits ?? {}),
@@ -84,7 +87,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfile = useCallback(
     async (
-      partial: Partial<Pick<Profile, 'display_name' | 'avatar_url' | 'persona_traits'>>
+      partial: Partial<
+        Pick<Profile, 'display_name' | 'avatar_url' | 'persona_traits' | 'bp_avatar_id'>
+      >
     ) => {
       if (!user) return;
 

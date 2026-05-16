@@ -1,23 +1,17 @@
 import type { PersonaTraits } from './providers/types.ts';
-
-interface MemorySnippet {
-  title: string | null;
-  body: string;
-  memory_year: number | null;
-  created_at: string;
-}
+import type { PromptMemory } from './load-prompt-memories.ts';
 
 /**
- * Builds the system prompt injected into every AI provider.
- * Encodes persona traits + recent journal memories so the avatar
- * sounds like the person being remembered.
+ * Builds the system prompt for the memory companion avatar.
+ * Purpose: support a person with dementia by gently helping them recall
+ * people, places, and stories from uploaded journals and memories.
  */
 export function buildSystemPrompt(
   displayName: string | null,
   traits: PersonaTraits,
-  memories: MemorySnippet[],
+  memories: PromptMemory[],
 ): string {
-  const name = displayName?.trim() || 'the person being remembered';
+  const name = displayName?.trim() || 'your loved one';
 
   const traitDesc = [
     `Humor level ${traits.humor}/100 — ${traits.humor > 60 ? 'often funny and light-hearted' : traits.humor > 30 ? 'occasionally witty' : 'serious and composed'}`,
@@ -29,26 +23,33 @@ export function buildSystemPrompt(
 
   const memorySection =
     memories.length > 0
-      ? `\n\nKnown memories and experiences:\n${memories
-          .slice(0, 8)
+      ? `\n\nKnown memories and experiences (use these to help the person remember):\n${memories
+          .slice(0, 12)
           .map(
             (m) =>
-              `- ${m.memory_year ? `[${m.memory_year}] ` : ''}${m.title ? `${m.title}: ` : ''}${m.body.slice(0, 300)}`,
+              `- ${m.memory_year ? `[${m.memory_year}] ` : ''}${m.title ? `${m.title}: ` : ''}${m.body.slice(0, 400)}`,
           )
           .join('\n')}`
       : '';
 
-  return `You are an AI echo of ${name} — a living memory avatar that speaks as this person would have spoken, drawing on their recorded memories, personality, and wisdom.
+  return `You are a warm memory companion avatar for ${name}. You are speaking with someone who has dementia. Your primary purpose is to help them remember what they have forgotten — gently, patiently, and without pressure.
 
-Personality traits:
+Core responsibilities:
+- Talk with the person in simple, calm, reassuring language.
+- Use the memories below to cue recognition: names, places, events, feelings, and sensory details.
+- When they seem confused, offer gentle reminders from the recorded journals and uploaded memories — never argue or correct harshly.
+- Celebrate small moments of recall; if they cannot remember, stay kind and pivot to comfort.
+- Speak as a trusted companion who knows ${name}'s life stories, not as a clinician or an AI.
+
+Personality when embodying ${name}'s voice:
 ${traitDesc}
 ${memorySection}
 
 Guidelines:
-- Speak in first person, as ${name} would.
-- Draw naturally from the memories above when relevant.
+- Prefer short sentences and one idea at a time.
+- Repeat important names and dates softly when helpful.
 - Do not invent facts not present in the memories.
-- If asked something you have no memory of, respond warmly but honestly.
-- Keep responses under 3 short paragraphs unless the verbosity trait is high.
-- Never break character or acknowledge being an AI.`;
+- If asked something with no matching memory, respond warmly: "I'm not sure, but we can look at this together."
+- Never break character, never mention being an AI, and never frighten or rush the listener.
+- Keep responses under 2–3 short paragraphs unless they ask for more detail.`;
 }

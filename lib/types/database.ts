@@ -19,6 +19,10 @@ export interface Profile {
   display_name: string | null;
   avatar_url: string | null;
   persona_traits: PersonaTraits;
+  bp_agent_id: string | null;
+  /** Beyond Presence digital-human avatar UUID (per user; from list-bey-avatars). */
+  bp_avatar_id: string | null;
+  avatar_knowledge_updated_at: string | null;
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;

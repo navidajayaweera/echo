@@ -1,28 +1,19 @@
 /**
  * BeyondPresenceActive
  *
- * The full-screen UI shown during an active Beyond Presence avatar session.
+ * Full-screen UI for a live Beyond Presence avatar session.
+ * Connects to the LiveKit room provisioned by Bey, renders real video
+ * (or AvatarPulse fallback), drives PTT mic, and forwards DataReceived
+ * events to the memory overlay.
  *
- * Layout (top → bottom):
- *   1. Session header   — elapsed timer + provider badge + end button
- *   2. Avatar viewport  — AvatarPulse centred with voice-state rings
- *   3. Voice-state label — "Listening…" / "Avatar is speaking…" / "Hold to talk"
- *   4. Caption bar      — live transcript of the avatar's last utterance
- *   5. PTT button       — large push-to-talk; hold to speak, release to receive
- *   6. End Session CTA  — unmistakable high-contrast red, full-width
- *
- * Accessibility decisions:
+ * Accessibility:
  *  - All interactive elements have accessibilityRole, accessibilityLabel,
  *    accessibilityHint — blind users get a complete description.
- *  - The "End Session" button is intentionally large (minHeight 64 dp) and
- *    separated from the PTT button by 16 dp to prevent accidental taps —
- *    important for users with tremor or reduced motor control.
+ *  - End Session is large (minHeight 64 dp) and separated by 16 dp to
+ *    prevent accidental taps — important for users with tremor.
  *  - Caption text is 16 sp / lineHeight 24, readable at arm's length.
- *  - Color-coding (green = listening, amber = speaking, red = end) uses at
- *    least 3:1 contrast ratio against the dark background on every element.
- *  - accessibilityLiveRegion="polite" on the caption lets VoiceOver users
- *    hear new caption text automatically without focus interruption.
- *  - The PTT label changes with voiceState so TalkBack announces state changes.
+ *  - Color-coding uses ≥ 3:1 contrast against the dark background.
+ *  - accessibilityLiveRegion="polite" on captions for VoiceOver.
  */
 
 import * as Haptics from 'expo-haptics';
@@ -32,16 +23,17 @@ import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { EchoColors, EchoFonts } from '@/constants/echo-theme';
 import { useAppInsets } from '@/hooks/use-app-insets';
+import { useLiveKitRoom } from '@/hooks/useLiveKitRoom';
 import type { LiveKitCreds } from '@/lib/types/ai-session';
 import type { MemoryRecalledEvent } from '@/lib/types/memory-events';
-import { AvatarPulse, type AvatarVoiceState } from './AvatarPulse';
+import { LiveKitAvatarViewport } from './LiveKitAvatarViewport';
 import { MemoryModePane } from './MemoryModePane';
 
 // ── Semantic colour tokens ─────────────────────────────────────────────────────
 
-const END_RED      = '#DC5050';   // high-contrast red — end session
-const LISTEN_GREEN = '#5AC87C';   // bright green — user is speaking
-const SPEAK_AMBER  = '#E8B86D';   // warm amber — avatar is speaking
+const END_RED      = '#DC5050';
+const LISTEN_GREEN = '#5AC87C';
+const SPEAK_AMBER  = '#E8B86D';
 
 // ── Session elapsed timer ─────────────────────────────────────────────────────
 
@@ -59,32 +51,16 @@ function useElapsed() {
   return `${mm}:${ss}`;
 }
 
-// ── Voice-state label text ────────────────────────────────────────────────────
-
-const VOICE_LABEL: Record<AvatarVoiceState, string> = {
-  IDLE: 'Hold the button below to speak',
-  LISTENING: 'Listening to you…',
-  SPEAKING: 'Avatar is responding…',
-};
-
-const VOICE_LABEL_COLOR: Record<AvatarVoiceState, string> = {
-  IDLE: EchoColors.textDim,
-  LISTENING: LISTEN_GREEN,
-  SPEAKING: SPEAK_AMBER,
-};
-
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface BeyondPresenceActiveProps {
   livekitCreds: LiveKitCreds;
-  voiceState: AvatarVoiceState;
   captionText: string;
   avatarLabel?: string;
   memoryOpen: boolean;
   memory: MemoryRecalledEvent | null;
   onMemoryClose: () => void;
-  onStartListening: () => void;
-  onStopListening: () => void;
+  onLiveKitData: (payload: Uint8Array) => void;
   onEndSession: () => void;
 }
 
@@ -92,21 +68,33 @@ interface BeyondPresenceActiveProps {
 
 export function BeyondPresenceActive({
   livekitCreds,
-  voiceState,
   captionText,
   avatarLabel = 'E',
   memoryOpen,
   memory,
   onMemoryClose,
-  onStartListening,
-  onStopListening,
+  onLiveKitData,
   onEndSession,
 }: BeyondPresenceActiveProps) {
-  const { fabBottom, horizontal, left, right } = useAppInsets({ includeTabBar: true });
+  const { fabBottom, horizontal, right } = useAppInsets({ includeTabBar: true });
   const elapsed = useElapsed();
 
-  // Subtle scale animation on the PTT button so it "breathes" when idle,
-  // then snaps to solid when the user is holding it.
+  // ── LiveKit room ───────────────────────────────────────────────────────────
+  const {
+    roomState,
+    voiceState,
+    remoteVideoTrack,
+    startListening,
+    stopListening,
+    disconnect,
+    errorMessage,
+  } = useLiveKitRoom({
+    wsUrl: livekitCreds.wsUrl,
+    token: livekitCreds.token,
+    onData: onLiveKitData,
+  });
+
+  // ── PTT button breathing animation ────────────────────────────────────────
   const pttScale = useRef(new Animated.Value(1)).current;
   const animRef  = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -116,7 +104,7 @@ export function BeyondPresenceActive({
       animRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pttScale, { toValue: 1.04, duration: 900, useNativeDriver: true }),
-          Animated.timing(pttScale, { toValue: 1, duration: 900, useNativeDriver: true }),
+          Animated.timing(pttScale, { toValue: 1,    duration: 900, useNativeDriver: true }),
         ]),
       );
       animRef.current.start();
@@ -136,20 +124,33 @@ export function BeyondPresenceActive({
     : voiceState === 'SPEAKING' ? 'Avatar speaking…'
     : 'Hold to speak';
 
+  const voiceLabelText: Record<typeof voiceState, string> = {
+    IDLE: 'Hold the button below to speak',
+    LISTENING: 'Listening to you…',
+    SPEAKING: 'Avatar is responding…',
+  };
+
+  const voiceLabelColor: Record<typeof voiceState, string> = {
+    IDLE: EchoColors.textDim,
+    LISTENING: LISTEN_GREEN,
+    SPEAKING: SPEAK_AMBER,
+  };
+
   const handlePressIn = async () => {
-    if (voiceState === 'SPEAKING') return; // don't interrupt the avatar
+    if (voiceState === 'SPEAKING' || roomState !== 'connected') return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onStartListening();
+    startListening();
   };
 
   const handlePressOut = async () => {
     if (voiceState !== 'LISTENING') return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onStopListening();
+    stopListening();
   };
 
   const handleEnd = async () => {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    disconnect();
     onEndSession();
   };
 
@@ -159,7 +160,7 @@ export function BeyondPresenceActive({
       {/* ── Session header ── */}
       <View style={styles.sessionHeader}>
         <View style={styles.headerLeft}>
-          <View style={styles.liveDot} />
+          <View style={[styles.liveDot, roomState === 'connected' && styles.liveDotActive]} />
           <Text style={styles.providerLabel} allowFontScaling={false}>
             Beyond Presence
           </Text>
@@ -167,19 +168,26 @@ export function BeyondPresenceActive({
         <Text style={styles.timer} allowFontScaling={false}>{elapsed}</Text>
       </View>
 
-      {/* ── Avatar viewport ── */}
+      {/* ── Avatar viewport (real LiveKit video or AvatarPulse fallback) ── */}
       <View style={styles.avatarArea}>
-        {/* Placeholder for the LiveKit video track; renders AvatarPulse until
-            @livekit/react-native is installed and a video track is published. */}
-        <View style={styles.videoPlaceholder}>
-          <AvatarPulse voiceState={voiceState} size={130} label={avatarLabel} />
-        </View>
+        <LiveKitAvatarViewport
+          remoteVideoTrack={remoteVideoTrack}
+          voiceState={voiceState}
+          roomState={roomState}
+          avatarLabel={avatarLabel}
+          size={130}
+        />
 
-        {/* Voice-state label — colour-coded and accessible via live region */}
+        {/* Connection error */}
+        {errorMessage ? (
+          <Text style={styles.errorText} allowFontScaling={false}>{errorMessage}</Text>
+        ) : null}
+
+        {/* Voice-state label */}
         <View
           style={styles.voiceLabelRow}
           accessibilityLiveRegion="polite"
-          accessibilityLabel={VOICE_LABEL[voiceState]}>
+          accessibilityLabel={voiceLabelText[voiceState]}>
           {voiceState === 'LISTENING' && (
             <View style={[styles.stateDot, { backgroundColor: LISTEN_GREEN }]} />
           )}
@@ -187,9 +195,9 @@ export function BeyondPresenceActive({
             <View style={[styles.stateDot, { backgroundColor: SPEAK_AMBER }]} />
           )}
           <Text
-            style={[styles.voiceLabel, { color: VOICE_LABEL_COLOR[voiceState] }]}
+            style={[styles.voiceLabel, { color: voiceLabelColor[voiceState] }]}
             allowFontScaling={false}>
-            {VOICE_LABEL[voiceState]}
+            {voiceLabelText[voiceState]}
           </Text>
         </View>
       </View>
@@ -206,16 +214,16 @@ export function BeyondPresenceActive({
         </View>
       )}
 
-      {/* ── Controls area ── */}
+      {/* ── Controls ── */}
       <View style={[styles.controls, { paddingBottom: fabBottom + 8 }]}>
 
-        {/* PTT button — large, semantically labelled, haptic feedback */}
+        {/* PTT button */}
         <Animated.View style={{ transform: [{ scale: pttScale }], width: '100%' }}>
           <Pressable
             style={[styles.pttButton, { backgroundColor: pttColor + '22', borderColor: pttColor }]}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
-            disabled={voiceState === 'SPEAKING'}
+            disabled={voiceState === 'SPEAKING' || roomState !== 'connected'}
             accessibilityRole="button"
             accessibilityLabel={pttLabel}
             accessibilityHint={
@@ -236,7 +244,7 @@ export function BeyondPresenceActive({
           </Pressable>
         </Animated.View>
 
-        {/* End Session button — high-contrast red, clearly separated */}
+        {/* End session */}
         <Pressable
           style={({ pressed }) => [
             styles.endButton,
@@ -274,7 +282,6 @@ const styles = StyleSheet.create({
     gap: 16,
   },
 
-  // ── Session header ──
   sessionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -292,6 +299,9 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 4.5,
+    backgroundColor: EchoColors.textDim,
+  },
+  liveDotActive: {
     backgroundColor: LISTEN_GREEN,
   },
   providerLabel: {
@@ -305,29 +315,17 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
 
-  // ── Avatar ──
   avatarArea: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
+    gap: 16,
   },
-  /** Placeholder fills the space where LiveKit video will render */
-  videoPlaceholder: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: EchoColors.bgCard,
-    paddingVertical: 36,
-    borderWidth: 1,
-    borderColor: EchoColors.border,
-    // Subtle inner glow using shadow so the avatar "floats"
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+  errorText: {
+    color: '#DC5050',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
   voiceLabelRow: {
     flexDirection: 'row',
@@ -345,7 +343,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // ── Caption bar ──
   captionBar: {
     backgroundColor: 'rgba(10,10,11,0.90)',
     borderRadius: 14,
@@ -361,13 +358,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ── Controls ──
   controls: {
     gap: 12,
     alignItems: 'center',
   },
-
-  // PTT button
   pttButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -391,8 +385,6 @@ const styles = StyleSheet.create({
     fontSize: 19,
     flex: 1,
   },
-
-  // End session button
   endButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -404,7 +396,6 @@ const styles = StyleSheet.create({
     gap: 10,
     width: '100%',
     minHeight: 64,
-    // iOS shadow for depth
     shadowColor: END_RED,
     shadowOpacity: 0.35,
     shadowRadius: 12,

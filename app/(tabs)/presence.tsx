@@ -15,7 +15,6 @@ import {
 
 import { BeyondPresenceActive } from '@/components/presence/BeyondPresenceActive';
 import { BeyondPresenceIdle } from '@/components/presence/BeyondPresenceIdle';
-import { MemoryModePane } from '@/components/presence/MemoryModePane';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { EchoColors, EchoFonts } from '@/constants/echo-theme';
@@ -282,15 +281,12 @@ export default function PresenceScreen() {
     isTyping,
     livekitCreds,
     latestAssistantMessage,
-    avatarVoiceState,
     startSession,
     sendMessage,
     endSession,
-    startListening,
-    stopListening,
   } = useAISession();
 
-  const { isOpen: memoryOpen, memory, close: closeMemory } = useMemoryOverlay();
+  const { isOpen: memoryOpen, memory, close: closeMemory, handleLiveKitData } = useMemoryOverlay();
 
   const [inputText, setInputText] = useState('');
   const [timestampedMessages, setTimestampedMessages] = useState<TimestampedMessage[]>([]);
@@ -493,14 +489,12 @@ export default function PresenceScreen() {
         {isBP && livekitCreds && (
           <BeyondPresenceActive
             livekitCreds={livekitCreds}
-            voiceState={avatarVoiceState}
             captionText={latestAssistantMessage}
             avatarLabel="E"
             memoryOpen={memoryOpen}
             memory={memory}
             onMemoryClose={closeMemory}
-            onStartListening={startListening}
-            onStopListening={stopListening}
+            onLiveKitData={handleLiveKitData}
             onEndSession={endSession}
           />
         )}

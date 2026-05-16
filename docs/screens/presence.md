@@ -118,37 +118,66 @@ The full conversation history is sent with every request (stateless API). The ed
 
 ## Beyond Presence mode
 
-### Current state (placeholder)
+### API (official: api.bey.dev)
 
-`BPPlaceholder` renders a black rectangle with the room name and a note about LiveKit wiring.
+Beyond Presence runs the avatar agent and provisions a LiveKit room. The client app uses `@livekit/react-native` to join that room — no LiveKit Cloud account needed in the app itself.
 
-The PTT button is visible but inert — it will connect to LiveKit mic track publishing in the next sprint.
+| Step | Where | API |
+|------|-------|-----|
+| Agent create / update (memory-grounded prompt) | `_shared/beyond-presence-agent.ts` | `POST/PATCH https://api.bey.dev/v1/agents` |
+| Create call → get LiveKit creds | `_shared/providers/beyond-presence.ts` | `POST https://api.bey.dev/v1/calls` |
+| Join room + video + PTT + data events | `hooks/useLiveKitRoom.ts` | `@livekit/react-native` |
 
-### Next sprint wiring
+Auth for all Bey API calls: `x-api-key: <BEY_API_KEY>` header.
 
-```ts
-// Install: npx expo install @livekit/react-native
+### Per-user Beyond Presence avatar
 
-import { Room, RoomEvent } from '@livekit/react-native';
+Each Echo user stores `profiles.bp_avatar_id` (UUID from Bey). The app loads avatars with **`GET /functions/v1/list-bey-avatars`** (proxies `GET https://api.bey.dev/v1/avatars`). In **Settings → Echo avatar**, the user taps **Load avatars** and selects one that is **ready** (`status: available`). That updates the profile and triggers **`refresh-avatar-knowledge`** so the managed agent is created or patched with the correct `avatar_id`.
 
-const room = new Room();
-await room.connect(livekitCreds.wsUrl, livekitCreds.token);
+Optional server fallback when no profile avatar is set:
 
-// Video
-room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-  if (track.kind === Track.Kind.Video) {
-    setVideoTrack(track); // render in <VideoView track={videoTrack} />
-  }
-});
+```bash
+npx supabase secrets set BEY_DEFAULT_AVATAR_ID=<public or shared default avatar UUID>
+```
 
-// Memory overlay events
-room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
-  handleLiveKitData(payload);
-});
+### Supabase secrets
 
-// PTT
-onPressIn:  await room.localParticipant.setMicrophoneEnabled(true);
-onPressOut: await room.localParticipant.setMicrophoneEnabled(false);
+```bash
+npx supabase secrets set BEY_API_KEY=<key from bey.dev dashboard>
+```
+
+Old secrets no longer needed: `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL`, `BEYOND_PRESENCE_API_KEY`, `BEY_AVATAR_ID` (replaced by per-user `bp_avatar_id` + optional `BEY_DEFAULT_AVATAR_ID`).
+
+### Call flow
+
+```
+start-ai-session edge function
+  → PATCH api.bey.dev/v1/agents/{id}   (update memory prompt)
+  → POST  api.bey.dev/v1/calls         { agent_id }
+  ← { livekit_url, livekit_token, id }
+
+App receives: { wsUrl, token, roomName }
+  → room.connect(wsUrl, token)          (@livekit/react-native)
+  ← remote video + audio tracks
+  ← DataReceived → memory.recalled event → MemoryModePane
+PTT: room.localParticipant.setMicrophoneEnabled(true/false)
+```
+
+### Key client files
+
+| File | Role |
+|------|------|
+| `hooks/useLiveKitRoom.ts` | Room connect/disconnect, video track, PTT mic, voice state, DataReceived |
+| `components/presence/LiveKitAvatarViewport.tsx` | VideoView (real) or AvatarPulse (fallback) + status badge |
+| `components/presence/BeyondPresenceActive.tsx` | Full session UI; calls `useLiveKitRoom` internally |
+
+### Dev build requirement
+
+`@livekit/react-native` uses native modules — **Expo Go will not work**. This package **does not** ship an Expo config plugin; do **not** add it to `plugins` in `app.json` (that causes `PluginError`). Microphone usage is declared in `app.json` under `ios.infoPlist` and `android.permissions`.
+
+```bash
+npx expo prebuild
+npx expo run:android    # or run:ios
 ```
 
 ---
@@ -188,11 +217,17 @@ The system prompt is rebuilt on **every request** — ensuring it always reflect
 |------|------|
 | `app/(tabs)/presence.tsx` | Screen + layout + state wiring |
 | `hooks/useAISession.ts` | Session state machine + message management |
+| `hooks/useLiveKitRoom.ts` | LiveKit room, video/audio tracks, PTT, DataReceived |
 | `lib/ai-session.ts` | `callAISession()` fetch helper |
 | `lib/types/ai-session.ts` | Request/response TypeScript types |
 | `hooks/useMemoryOverlay.ts` | LiveKit data parser + store trigger |
+| `components/presence/LiveKitAvatarViewport.tsx` | VideoView or AvatarPulse fallback |
+| `components/presence/BeyondPresenceActive.tsx` | Full BP session UI (owns `useLiveKitRoom`) |
 | `stores/memory-overlay.store.ts` | Overlay open/close state |
-| `stores/session.store.ts` | Global session metadata (for settings) |
 | `components/presence/MemoryModePane.tsx` | Animated side panel |
 | `components/presence/MemoryRecallCard.tsx` | Memory display card |
 | `supabase/functions/start-ai-session/` | Edge function + provider registry |
+| `supabase/functions/_shared/providers/beyond-presence.ts` | `POST /v1/calls` → LiveKit creds |
+| `supabase/functions/_shared/beyond-presence-agent.ts` | `POST/PATCH /v1/agents` (uses `bp_avatar_id`) |
+| `supabase/functions/list-bey-avatars/` | Proxy `GET /v1/avatars` for Settings picker |
+| `components/settings/BeyAvatarSection.tsx` | Load + select `bp_avatar_id` |

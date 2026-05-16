@@ -17,6 +17,7 @@ import {
 import { MediaAttachmentStrip, type AttachedMedia } from '@/components/journal/MediaAttachmentStrip';
 import { MoodPicker, type MoodKey } from '@/components/journal/MoodPicker';
 import { EchoColors, EchoFonts } from '@/constants/echo-theme';
+import { feedMemoryToAvatar } from '@/lib/avatar-feed';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -128,7 +129,10 @@ export function JournalComposer({ visible, onClose, onSave }: JournalComposerPro
           .single();
 
         if (dbErr) throw dbErr;
-        if (row?.id) ids.push(row.id);
+        if (row?.id) {
+          ids.push(row.id);
+          feedMemoryToAvatar(row.id).catch(() => {});
+        }
       } catch {
         // Non-fatal: media upload failure shouldn't block journal save
       } finally {

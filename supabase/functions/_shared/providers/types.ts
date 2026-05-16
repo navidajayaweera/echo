@@ -53,7 +53,16 @@ export type StartSessionResult = BeyondPresenceSessionResult | LLMSessionResult;
 
 // ── Provider interface ────────────────────────────────────────────────────────
 
+export interface ProviderRunOptions {
+  /** Persistent Beyond Presence agent trained on the user's memories */
+  bpAgentId?: string | null;
+}
+
 export interface AIProvider {
   readonly name: ProviderName;
-  run(req: StartSessionRequest, systemPrompt: string): Promise<StartSessionResult>;
+  run(
+    req: StartSessionRequest,
+    systemPrompt: string,
+    options?: ProviderRunOptions,
+  ): Promise<StartSessionResult>;
 }

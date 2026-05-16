@@ -10,7 +10,11 @@ const DEFAULT_MODEL = 'gpt-4o-mini';
 export class OpenAIProvider implements AIProvider {
   readonly name = 'openai' as const;
 
-  async run(req: StartSessionRequest, systemPrompt: string): Promise<LLMSessionResult> {
+  async run(
+    req: StartSessionRequest,
+    systemPrompt: string,
+    _options?: import('./types.ts').ProviderRunOptions,
+  ): Promise<LLMSessionResult> {
     const apiKey = Deno.env.get('OPENAI_API_KEY');
     if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
 

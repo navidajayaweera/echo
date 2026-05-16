@@ -16,8 +16,8 @@ export function SyncStatusBadge({
   const statusText = isSyncing
     ? 'Synchronizing…'
     : avatarSynced
-      ? 'Avatar linked'
-      : 'Avatar pending setup';
+      ? 'Avatar trained on your memories'
+      : 'Avatar learning your memories…';
 
   return (
     <View style={styles.card}>

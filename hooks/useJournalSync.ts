@@ -7,6 +7,7 @@ import {
   syncPendingJournals,
   syncUnembeddedJournals,
 } from '@/lib/journal-sync';
+import { syncUnembeddedMemories } from '@/lib/memory-sync';
 import { useAuth } from '@/providers/AuthProvider';
 
 export function useJournalSync(onSynced?: () => void): {
@@ -37,6 +38,7 @@ export function useJournalSync(onSynced?: () => void): {
         }
         await syncPendingJournals(user.id);
         await syncUnembeddedJournals(user.id);
+        await syncUnembeddedMemories(user.id);
         setLastSyncAt(new Date().toISOString());
         onSyncedRef.current?.();
       } catch (err) {
