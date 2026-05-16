@@ -1,61 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { useJournalSyncContext } from '@/providers/JournalSyncProvider';
+import { ConnectionChecklist } from '@/components/settings/ConnectionChecklist';
+import { PersonaSlider } from '@/components/settings/PersonaSlider';
+import { EchoTextInput } from '@/components/ui/EchoTextInput';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { PERSONA_TRAIT_LABELS } from '@/constants/persona';
+import { EchoColors } from '@/constants/echo-theme';
 import { DEFAULT_PERSONA_TRAITS, type PersonaTraits } from '@/lib/types/database';
+import { useAppInsets } from '@/hooks/use-app-insets';
+import { useJournalSyncContext } from '@/providers/JournalSyncProvider';
 import { useAuth } from '@/providers/AuthProvider';
 
-function PersonaSlider({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <View style={styles.sliderRow}>
-      <View style={styles.sliderHeader}>
-        <Text style={styles.sliderLabel}>{label}</Text>
-        <Text style={styles.sliderValue}>{Math.round(value)}</Text>
-      </View>
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: `${value}%` }]} />
-        <View style={styles.touchRow}>
-          {[0, 25, 50, 75, 100].map((step) => (
-            <Text
-              key={step}
-              style={styles.stepTouch}
-              onPress={() => onChange(step)}>
-              {' '}
-            </Text>
-          ))}
-        </View>
-      </View>
-      <View style={styles.stepButtons}>
-        <Text style={styles.stepBtn} onPress={() => onChange(Math.max(0, value - 10))}>
-          −
-        </Text>
-        <Text style={styles.stepBtn} onPress={() => onChange(Math.min(100, value + 10))}>
-          +
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 export default function SettingsScreen() {
-  const insets = useSafeAreaInsets();
-  const { profile, isConfigured, updateProfile } = useAuth();
+  const {
+    profile,
+    isConfigured,
+    isAnonymous,
+    user,
+    updateProfile,
+    signOut,
+  } = useAuth();
   const { isSyncing, lastSyncAt, syncError } = useJournalSyncContext();
+  const { contentBottom } = useAppInsets({ includeTabBar: true });
 
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [traits, setTraits] = useState<PersonaTraits>(
@@ -99,169 +68,104 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'You will return to the login screen.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch (e) {
+            Alert.alert('Error', e instanceof Error ? e.message : 'Sign out failed');
+          }
+        },
+      },
+    ]);
+  };
+
+  const checklist = [
+    {
+      label: 'Supabase',
+      status: isConfigured ? ('ok' as const) : ('warn' as const),
+      detail: isConfigured ? 'Connected' : 'Missing .env',
+    },
+    {
+      label: 'Journal sync',
+      status: syncError ? ('warn' as const) : isSyncing ? ('pending' as const) : ('ok' as const),
+      detail: syncError ?? (lastSyncAt ? `OK · ${new Date(lastSyncAt).toLocaleTimeString()}` : 'Ready'),
+    },
+    {
+      label: 'Beyond Presence',
+      status: 'pending' as const,
+      detail: 'Next sprint',
+    },
+    {
+      label: 'LiveKit',
+      status: 'pending' as const,
+      detail: 'Next sprint',
+    },
+  ];
+
   return (
-    <ScrollView
-      style={[styles.container, { paddingTop: insets.top }]}
-      contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Settings</Text>
+    <ScreenContainer includeTabBarPadding>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: contentBottom }}>
+        <SectionHeader title="Settings" subtitle="Persona & account" />
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Profile</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Display name"
-          placeholderTextColor="#6B6966"
-          value={displayName}
-          onChangeText={setDisplayName}
-          onEndEditing={handleDisplayNameBlur}
-        />
-      </View>
+        <Text style={styles.accountEmail}>{user?.email ?? (isAnonymous ? 'Guest session' : '')}</Text>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Persona</Text>
-        <PersonaSlider
-          label="Humor"
-          value={traits.humor}
-          onChange={(v) => handleTraitChange('humor', v)}
-        />
-        <PersonaSlider
-          label="Warmth"
-          value={traits.warmth}
-          onChange={(v) => handleTraitChange('warmth', v)}
-        />
-        <PersonaSlider
-          label="Wisdom"
-          value={traits.wisdom}
-          onChange={(v) => handleTraitChange('wisdom', v)}
-        />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Connection</Text>
-        <View style={styles.checkRow}>
-          <Text style={styles.checkLabel}>Supabase</Text>
-          <Text style={isConfigured ? styles.checkOk : styles.checkWarn}>
-            {isConfigured ? 'Configured' : 'Add .env keys'}
-          </Text>
+        <View style={styles.block}>
+          <Text style={styles.blockTitle}>Profile</Text>
+          <EchoTextInput
+            placeholder="Display name"
+            value={displayName}
+            onChangeText={setDisplayName}
+            onEndEditing={handleDisplayNameBlur}
+            autoCapitalize="words"
+          />
         </View>
-        <View style={styles.checkRow}>
-          <Text style={styles.checkLabel}>Journal sync</Text>
-          <Text style={syncError ? styles.checkWarn : styles.checkOk}>
-            {isSyncing
-              ? 'Syncing…'
-              : syncError
-                ? syncError
-                : lastSyncAt
-                  ? `OK · ${new Date(lastSyncAt).toLocaleTimeString()}`
-                  : 'Waiting'}
-          </Text>
+
+        <View style={styles.block}>
+          <Text style={styles.blockTitle}>Persona engine</Text>
+          {PERSONA_TRAIT_LABELS.map(({ key, label }) => (
+            <PersonaSlider
+              key={key}
+              label={label}
+              value={traits[key]}
+              onChange={(v) => handleTraitChange(key, v)}
+            />
+          ))}
         </View>
-      </View>
-    </ScrollView>
+
+        <View style={styles.block}>
+          <Text style={styles.blockTitle}>Connections</Text>
+          <ConnectionChecklist items={checklist} />
+        </View>
+
+        <PrimaryButton label="Sign out" onPress={handleSignOut} variant="outline" />
+      </ScrollView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0A0A0B',
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  title: {
-    color: '#F4F2EF',
-    fontSize: 32,
-    fontWeight: '300',
-    marginBottom: 24,
-  },
-  section: {
-    marginBottom: 28,
-  },
-  sectionTitle: {
-    color: '#8B8884',
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 12,
-  },
-  input: {
-    backgroundColor: '#141416',
-    borderRadius: 10,
-    padding: 14,
-    color: '#F4F2EF',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#232326',
-  },
-  sliderRow: {
+  accountEmail: {
+    color: EchoColors.textDim,
+    fontSize: 14,
     marginBottom: 20,
   },
-  sliderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+  block: {
+    marginBottom: 28,
   },
-  sliderLabel: {
-    color: '#F4F2EF',
-    fontSize: 16,
-  },
-  sliderValue: {
-    color: '#8B8884',
-    fontSize: 16,
-  },
-  track: {
-    height: 6,
-    backgroundColor: '#232326',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    backgroundColor: '#E8E6E3',
-    borderRadius: 3,
-  },
-  touchRow: {
-    position: 'absolute',
-    opacity: 0,
-  },
-  stepTouch: {
-    flex: 1,
-  },
-  stepButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 16,
-    marginTop: 8,
-  },
-  stepBtn: {
-    color: '#E8E6E3',
-    fontSize: 22,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  checkRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#232326',
-  },
-  checkLabel: {
-    color: '#F4F2EF',
-    fontSize: 16,
-  },
-  checkOk: {
-    color: '#7DCEA0',
-    fontSize: 14,
-  },
-  checkWarn: {
-    color: '#E8B86D',
-    fontSize: 14,
-    flex: 1,
-    textAlign: 'right',
-    marginLeft: 12,
+  blockTitle: {
+    color: EchoColors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 12,
   },
 });

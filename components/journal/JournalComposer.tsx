@@ -10,6 +10,8 @@ import {
   View,
 } from 'react-native';
 
+import { EchoColors } from '@/constants/echo-theme';
+
 interface JournalComposerProps {
   visible: boolean;
   onClose: () => void;
@@ -51,14 +53,14 @@ export function JournalComposer({ visible, onClose, onSave }: JournalComposerPro
           <TextInput
             style={styles.input}
             placeholder="Title (optional)"
-            placeholderTextColor="#6B6966"
+            placeholderTextColor={EchoColors.textDim}
             value={title}
             onChangeText={setTitle}
           />
           <TextInput
             style={[styles.input, styles.bodyInput]}
             placeholder="What do you want to preserve?"
-            placeholderTextColor="#6B6966"
+            placeholderTextColor={EchoColors.textDim}
             value={body}
             onChangeText={setBody}
             multiline
@@ -67,7 +69,7 @@ export function JournalComposer({ visible, onClose, onSave }: JournalComposerPro
           <TextInput
             style={styles.input}
             placeholder="Year (e.g. 1974)"
-            placeholderTextColor="#6B6966"
+            placeholderTextColor={EchoColors.textDim}
             value={year}
             onChangeText={setYear}
             keyboardType="number-pad"
@@ -96,29 +98,29 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   sheet: {
-    backgroundColor: '#141416',
+    backgroundColor: EchoColors.bgElevated,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 24,
     paddingBottom: 40,
     borderTopWidth: 1,
-    borderColor: '#232326',
+    borderColor: EchoColors.border,
   },
   heading: {
-    color: '#F4F2EF',
+    color: EchoColors.text,
     fontSize: 22,
     fontWeight: '600',
     marginBottom: 20,
   },
   input: {
-    backgroundColor: '#0A0A0B',
+    backgroundColor: EchoColors.bg,
     borderRadius: 10,
     padding: 14,
-    color: '#F4F2EF',
+    color: EchoColors.text,
     fontSize: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#232326',
+    borderColor: EchoColors.border,
   },
   bodyInput: {
     minHeight: 120,
@@ -134,10 +136,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#232326',
+    borderColor: EchoColors.border,
   },
   cancelText: {
-    color: '#A8A6A1',
+    color: EchoColors.textMuted,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -146,13 +148,13 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     borderRadius: 12,
-    backgroundColor: '#E8E6E3',
+    backgroundColor: EchoColors.accent,
   },
   saveBtnDisabled: {
     opacity: 0.4,
   },
   saveText: {
-    color: '#0A0A0B',
+    color: EchoColors.bg,
     fontSize: 16,
     fontWeight: '600',
   },

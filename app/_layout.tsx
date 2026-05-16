@@ -1,9 +1,8 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { RootNavigator } from '@/components/RootNavigator';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { JournalSyncProvider } from '@/providers/JournalSyncProvider';
 
@@ -12,19 +11,13 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <AuthProvider>
-      <JournalSyncProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style="light" />
-      </ThemeProvider>
-      </JournalSyncProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <JournalSyncProvider>
+          <RootNavigator />
+        </JournalSyncProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

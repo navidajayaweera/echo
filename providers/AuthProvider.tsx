@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { EchoColors } from '@/constants/echo-theme';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   DEFAULT_PERSONA_TRAITS,
@@ -22,7 +23,19 @@ interface AuthContextValue {
   profile: Profile | null;
   isLoading: boolean;
   isConfigured: boolean;
-  updateProfile: (partial: Partial<Pick<Profile, 'display_name' | 'avatar_url' | 'persona_traits'>>) => Promise<void>;
+  isAuthenticated: boolean;
+  isAnonymous: boolean;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (
+    email: string,
+    password: string,
+    displayName?: string
+  ) => Promise<void>;
+  signOut: () => Promise<void>;
+  continueAsGuest: () => Promise<void>;
+  updateProfile: (
+    partial: Partial<Pick<Profile, 'display_name' | 'avatar_url' | 'persona_traits'>>
+  ) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -39,28 +52,35 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
   return data as Profile | null;
 }
 
+function normalizeProfile(row: Profile): Profile {
+  return {
+    ...row,
+    persona_traits: {
+      ...DEFAULT_PERSONA_TRAITS,
+      ...(row.persona_traits ?? {}),
+    },
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const loadProfile = useCallback(async (userId: string) => {
+    const row = await fetchProfile(userId);
+    if (row) setProfile(normalizeProfile(row));
+    else setProfile(null);
+  }, []);
+
   const refreshProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
       return;
     }
-    const row = await fetchProfile(user.id);
-    if (row) {
-      setProfile({
-        ...row,
-        persona_traits: {
-          ...DEFAULT_PERSONA_TRAITS,
-          ...(row.persona_traits ?? {}),
-        },
-      });
-    }
-  }, [user]);
+    await loadProfile(user.id);
+  }, [user, loadProfile]);
 
   const updateProfile = useCallback(
     async (
@@ -79,10 +99,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) throw error;
-      setProfile(data as Profile);
+      setProfile(normalizeProfile(data as Profile));
     },
     [user]
   );
+
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    const { error } = await getSupabase().auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  }, []);
+
+  const signUpWithEmail = useCallback(
+    async (email: string, password: string, displayName?: string) => {
+      const { data, error } = await getSupabase().auth.signUp({ email, password });
+      if (error) throw error;
+
+      if (data.user && displayName?.trim()) {
+        await getSupabase()
+          .from('profiles')
+          .update({ display_name: displayName.trim() })
+          .eq('id', data.user.id);
+      }
+    },
+    []
+  );
+
+  const signOut = useCallback(async () => {
+    const { error } = await getSupabase().auth.signOut();
+    if (error) throw error;
+    setProfile(null);
+  }, []);
+
+  const continueAsGuest = useCallback(async () => {
+    const { error } = await getSupabase().auth.signInAnonymously();
+    if (error) throw error;
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -94,32 +145,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const supabase = getSupabase();
-        const { data: sessionData } = await supabase.auth.getSession();
-        let nextSession = sessionData.session;
-
-        if (!nextSession) {
-          const { data: anonData, error: anonError } =
-            await supabase.auth.signInAnonymously();
-          if (anonError) throw anonError;
-          nextSession = anonData.session;
-        }
-
+        const { data } = await getSupabase().auth.getSession();
         if (!mounted) return;
-        setSession(nextSession);
-        setUser(nextSession?.user ?? null);
-
-        if (nextSession?.user) {
-          const row = await fetchProfile(nextSession.user.id);
-          if (mounted && row) {
-            setProfile({
-              ...row,
-              persona_traits: {
-                ...DEFAULT_PERSONA_TRAITS,
-                ...(row.persona_traits ?? {}),
-              },
-            });
-          }
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+        if (data.session?.user) {
+          await loadProfile(data.session.user.id);
         }
       } catch (err) {
         console.warn('[AuthProvider] init failed:', err);
@@ -141,16 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(nextSession);
         setUser(nextSession?.user ?? null);
         if (nextSession?.user) {
-          const row = await fetchProfile(nextSession.user.id);
-          if (row) {
-            setProfile({
-              ...row,
-              persona_traits: {
-                ...DEFAULT_PERSONA_TRAITS,
-                ...(row.persona_traits ?? {}),
-              },
-            });
-          }
+          await loadProfile(nextSession.user.id);
         } else {
           setProfile(null);
         }
@@ -161,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [loadProfile]);
 
   const value = useMemo(
     () => ({
@@ -170,16 +192,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       isLoading,
       isConfigured: isSupabaseConfigured,
+      isAuthenticated: !!session,
+      isAnonymous: user?.is_anonymous ?? false,
+      signInWithEmail,
+      signUpWithEmail,
+      signOut,
+      continueAsGuest,
       updateProfile,
       refreshProfile,
     }),
-    [user, session, profile, isLoading, updateProfile, refreshProfile]
+    [
+      user,
+      session,
+      profile,
+      isLoading,
+      signInWithEmail,
+      signUpWithEmail,
+      signOut,
+      continueAsGuest,
+      updateProfile,
+      refreshProfile,
+    ]
   );
 
   if (isLoading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#E8E6E3" />
+        <ActivityIndicator size="large" color={EchoColors.accent} />
       </View>
     );
   }
@@ -198,7 +237,7 @@ export function useAuth() {
 const styles = StyleSheet.create({
   loading: {
     flex: 1,
-    backgroundColor: '#0A0A0B',
+    backgroundColor: EchoColors.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },

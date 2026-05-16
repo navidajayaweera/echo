@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { EchoColors } from '@/constants/echo-theme';
 import type { JournalCacheEntry } from '@/lib/types/database';
 
 interface JournalEntryCardProps {
@@ -36,12 +37,12 @@ export function JournalEntryCard({ entry }: JournalEntryCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#141416',
+    backgroundColor: EchoColors.bgElevated,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#232326',
+    borderColor: EchoColors.border,
   },
   header: {
     flexDirection: 'row',
@@ -51,7 +52,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: '#F4F2EF',
+    color: EchoColors.text,
     fontSize: 17,
     fontWeight: '600',
   },
@@ -59,11 +60,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#E8B86D',
+    backgroundColor: EchoColors.accentWarm,
     marginLeft: 8,
   },
   body: {
-    color: '#A8A6A1',
+    color: EchoColors.textMuted,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -73,11 +74,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   date: {
-    color: '#6B6966',
+    color: EchoColors.textDim,
     fontSize: 13,
   },
   year: {
-    color: '#8B8884',
+    color: EchoColors.textMuted,
     fontSize: 13,
     fontWeight: '500',
   },
