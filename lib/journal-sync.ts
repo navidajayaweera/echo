@@ -6,6 +6,18 @@ import {
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { JournalCacheEntry, JournalRow } from '@/lib/types/database';
 
+async function triggerJournalEmbedding(journalId: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.functions.invoke('embed-journal', {
+    body: { journal_id: journalId },
+  });
+
+  if (error) {
+    // Keep sync resilient: journal content should still sync even if embedding fails.
+    console.warn('[journal-sync] embed-journal failed:', journalId, error.message);
+  }
+}
+
 function rowToCacheEntry(row: JournalRow): JournalCacheEntry {
   return {
     localId: row.local_id ?? row.id,
@@ -123,4 +135,29 @@ export async function syncPendingJournals(userId: string): Promise<number> {
   }
 
   return syncedCount;
+}
+
+export async function syncUnembeddedJournals(userId: string): Promise<number> {
+  if (!isSupabaseConfigured) return 0;
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('journals')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_embedded', false)
+    .order('updated_at', { ascending: false })
+    .limit(25);
+
+  if (error) {
+    console.warn('[journal-sync] list unembedded journals failed:', error.message);
+    return 0;
+  }
+
+  const unembedded = data ?? [];
+  for (const row of unembedded) {
+    await triggerJournalEmbedding(row.id);
+  }
+
+  return unembedded.length;
 }

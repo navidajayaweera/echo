@@ -59,7 +59,7 @@ MediaUploadPicker (UI modal)
 
 ### How it works
 
-Each journal entry is transformed into a vector representation using OpenAI's `text-embedding-3-small` model (1536 dimensions). The vectors are stored in the `journal_embeddings` table with an HNSW index for fast approximate nearest-neighbour (ANN) search.
+Each journal entry is transformed into a vector representation using Google's `gemini-embedding-001` model (1536 dimensions via `outputDimensionality`). The vectors are stored in the `journal_embeddings` table with an HNSW index for fast approximate nearest-neighbour (ANN) search.
 
 ```
 POST /functions/v1/embed-journal { journal_id }
@@ -71,8 +71,9 @@ POST /functions/v1/embed-journal { journal_id }
        Chunk 1: chars 320–720
        Chunk 2: chars 640–1040
        …
-  4. Batch POST to OpenAI /v1/embeddings
-       model: text-embedding-3-small
+  4. Batch POST to Gemini batchEmbedContents
+       model: gemini-embedding-001
+       taskType: RETRIEVAL_DOCUMENT
        input: [chunk0, chunk1, chunk2, …]
   5. UPSERT journal_embeddings:
        { journal_id, user_id, chunk_index, chunk_text, embedding: vector(1536) }
@@ -102,43 +103,29 @@ CREATE INDEX ON journal_embeddings
 | Trigger | Status |
 |---------|--------|
 | Manual: `POST /embed-journal { journal_id }` | ✅ Available |
-| After `syncPendingJournals` | 🔨 Not yet wired (next sprint) |
+| After `syncPendingJournals` | ✅ Wired (auto invoke per successful upsert) |
+| Backfill unembedded rows on sync cycle | ✅ Wired (`syncUnembeddedJournals`) |
 | Background queue via Supabase pg_cron | 📋 Backlog |
 
 ---
 
 ## Lane 3 — Recall
 
-### Current implementation (text-based)
+### Current implementation (vector-first with fallback)
 
-`start-ai-session` currently loads the 10 most recent journal entries by `created_at DESC` and passes their text directly to `buildSystemPrompt`. This is fast and requires no embeddings.
+`start-ai-session` now follows a vector-first retrieval path:
 
 ```ts
-const { data: memories } = await supabase
+const queryEmbedding = await createEmbedding(lastUserMessageOrDefault);
+const { data: memories } = await supabase.rpc('match_memories', ...);
+
+// If embeddings are unavailable, RPC errors, or no matches are returned:
+const fallback = await supabase
   .from('journals')
   .select('title, body, memory_year, created_at')
   .eq('user_id', user.id)
   .order('created_at', { ascending: false })
   .limit(10);
-```
-
-### Planned: vector RAG recall
-
-Once journals are embedded, recall should use semantic similarity instead of recency:
-
-```ts
-// Inside start-ai-session (planned)
-const queryEmbedding = await openai.embeddings.create({
-  model: 'text-embedding-3-small',
-  input: lastUserMessage,
-});
-
-const { data: memories } = await supabase.rpc('match_memories', {
-  query_embedding: queryEmbedding.data[0].embedding,
-  match_user_id: user.id,
-  match_count: 6,
-  match_threshold: 0.72,
-});
 ```
 
 ### `match_memories` RPC
@@ -322,8 +309,7 @@ echo_sessions
 
 | Upgrade | Impact | Effort |
 |---------|--------|--------|
-| Auto-trigger `embed-journal` after sync | All entries become searchable | Low |
-| Switch recall to `match_memories` RPC | Semantic rather than recency-based | Medium |
+| Tune `match_memories` threshold + top-K per provider | Better precision/recall balance | Low |
 | Embed `media_vault` descriptions | Photos/letters searchable by meaning | Medium |
 | Per-turn embedding: embed last user message → query vector → inject top-K | Context-aware per turn, not just session start | High |
 | BP memory.recalled event → fetch Supabase signed URL for `mediaId` | Show actual photo in overlay, not just text | Medium |
