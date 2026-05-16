@@ -65,7 +65,7 @@ User writes entry in JournalComposer
       → syncPendingJournals()
           → supabase.from('journals').upsert({ ..., local_id })
           → On success: flip pendingSync → false, store remote id
-  → (Optional, next sprint) POST /functions/v1/embed-journal { journal_id }
+          → auto POST /functions/v1/embed-journal { journal_id }
       → embed-journal chunks body → OpenAI embeddings → journal_embeddings table
 ```
 
@@ -80,7 +80,7 @@ User taps "Begin session"
           → POST /functions/v1/start-ai-session
               → verifyUser (JWT)
               → load profile + persona_traits from DB
-              → fetch last 10 journals for memory context
+              → embed latest user message + query `match_memories` (fallback to latest journals)
               → buildSystemPrompt(displayName, traits, memories)
               → OpenAIProvider.run() or GeminiProvider.run()
               → returns { provider, message, model, sessionId }

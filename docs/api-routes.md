@@ -94,11 +94,13 @@ Content-Type: application/json
 ```
 1. verifyUser(Authorization header)
 2. Load profiles row → persona_traits
-3. Load last 10 journals → memory snippets
-4. buildSystemPrompt(displayName, traits, memories)
-5. PROVIDERS[provider].run(request, systemPrompt)
-6. [Beyond Presence only] INSERT INTO echo_sessions (best-effort)
-7. Return result
+3. Embed latest user message (or default recall query) with OpenAI `text-embedding-3-small`
+4. `rpc('match_memories')` for semantic recall
+5. Fallback to last 10 journals if embedding/RPC fails or no semantic matches
+6. buildSystemPrompt(displayName, traits, memories)
+7. PROVIDERS[provider].run(request, systemPrompt)
+8. [Beyond Presence only] INSERT INTO echo_sessions (best-effort)
+9. Return result
 ```
 
 ### System prompt structure
@@ -228,7 +230,7 @@ supabase secrets set LIVEKIT_URL=wss://your-project.livekit.cloud
 
 ### `match_memories(query_embedding, match_user_id, match_count, match_threshold)`
 
-Vector similarity search. Called from `start-ai-session` (planned — currently using raw LIMIT 10 text).
+Vector similarity search. Called by `start-ai-session` for semantic memory retrieval.
 
 ```sql
 SELECT * FROM match_memories(

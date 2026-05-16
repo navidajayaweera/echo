@@ -28,6 +28,8 @@ This `docs/` folder is the single source of truth for every human and AI agent w
 
 Echoes lets users capture memories as journal entries and multimedia uploads. A Supabase backend indexes those memories as vector embeddings. When users open the **Presence** tab they can converse with an AI echo of a person via text chat (OpenAI / Gemini) or a hyper-realistic live avatar via Beyond Presence + LiveKit WebRTC. The avatar's responses are grounded in the user's stored memories through a RAG (Retrieval-Augmented Generation) pipeline. A Memory Mode overlay slides in during sessions to surface the specific memory being referenced.
 
+The expected Supabase project for this app is **echo**; configure `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` from that project.
+
 ---
 
 ## Repository root structure
@@ -60,7 +62,7 @@ echo/
 │   └── session.store.ts
 ├── supabase/
 │   ├── config.toml           Local dev configuration
-│   ├── migrations/           Ordered SQL migration files (001–007)
+│   ├── migrations/           Ordered SQL migration files (001–008)
 │   └── functions/            Deno Edge Functions
 │       ├── start-ai-session/
 │       ├── embed-journal/

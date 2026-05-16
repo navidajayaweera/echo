@@ -6,6 +6,7 @@ import { GeminiProvider } from '../_shared/providers/gemini.ts';
 import { OpenAIProvider } from '../_shared/providers/openai.ts';
 import type {
   AIProvider,
+  ChatMessage,
   ProviderName,
   StartSessionRequest,
 } from '../_shared/providers/types.ts';
@@ -16,6 +17,100 @@ const PROVIDERS: Record<ProviderName, AIProvider> = {
   openai: new OpenAIProvider(),
   gemini: new GeminiProvider(),
 };
+const EMBEDDING_MODEL = 'text-embedding-3-small';
+
+type PromptMemory = {
+  title: string | null;
+  body: string;
+  memory_year: number | null;
+  created_at: string;
+};
+
+function getMemoryQuery(messages: ChatMessage[] | undefined): string {
+  if (!messages || messages.length === 0) {
+    return 'important personal memories and life experiences';
+  }
+
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].role === 'user' && messages[i].content.trim()) {
+      return messages[i].content.trim();
+    }
+  }
+
+  return 'important personal memories and life experiences';
+}
+
+async function embedQueryText(queryText: string): Promise<number[] | null> {
+  const openAiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openAiKey) return null;
+
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${openAiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: EMBEDDING_MODEL,
+      input: queryText,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`OpenAI embeddings error ${response.status}: ${err}`);
+  }
+
+  const data = await response.json();
+  const embedding = data.data?.[0]?.embedding;
+  return Array.isArray(embedding) ? embedding : null;
+}
+
+async function loadRecentMemories(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+): Promise<PromptMemory[]> {
+  const { data: memories } = await supabase
+    .from('journals')
+    .select('title, body, memory_year, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  return (memories ?? []) as PromptMemory[];
+}
+
+async function loadSemanticMemories(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+  queryText: string,
+): Promise<PromptMemory[] | null> {
+  const embedding = await embedQueryText(queryText);
+  if (!embedding) return null;
+
+  const { data, error } = await supabase.rpc('match_memories', {
+    query_embedding: JSON.stringify(embedding),
+    match_user_id: userId,
+    match_count: 8,
+    match_threshold: 0.72,
+  });
+
+  if (error) {
+    throw new Error(`match_memories RPC failed: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  const now = new Date().toISOString();
+  return (data as Array<{ chunk_text: string; memory_year: number | null }>).map((item) => ({
+    title: null,
+    body: item.chunk_text,
+    memory_year: item.memory_year,
+    created_at: now,
+  }));
+}
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
@@ -34,7 +129,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: `Unknown provider "${providerName}". Valid: ${Object.keys(PROVIDERS).join(', ')}` }, 400);
     }
 
-    // 3. Load profile + recent journal memories for system prompt
+    // 3. Load profile + memory context for system prompt
     const supabase = createAdminClient();
 
     const { data: profile } = await supabase
@@ -43,12 +138,18 @@ Deno.serve(async (req: Request) => {
       .eq('id', user.id)
       .maybeSingle();
 
-    const { data: memories } = await supabase
-      .from('journals')
-      .select('title, body, memory_year, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    const queryText = getMemoryQuery(messages);
+    let memories: PromptMemory[] = [];
+
+    try {
+      const semanticMemories = await loadSemanticMemories(supabase, user.id, queryText);
+      memories = semanticMemories && semanticMemories.length > 0
+        ? semanticMemories
+        : await loadRecentMemories(supabase, user.id);
+    } catch (err) {
+      console.warn('[start-ai-session] semantic memory lookup failed, using recency fallback:', err);
+      memories = await loadRecentMemories(supabase, user.id);
+    }
 
     const personaTraits = {
       humor: 50, warmth: 70, wisdom: 60, verbosity: 40, formality: 30,
@@ -59,7 +160,7 @@ Deno.serve(async (req: Request) => {
     const systemPrompt = buildSystemPrompt(
       profile?.display_name ?? null,
       personaTraits,
-      memories ?? [],
+      memories,
     );
 
     // 4. Delegate to provider

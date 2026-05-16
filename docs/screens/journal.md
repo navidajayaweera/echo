@@ -133,6 +133,5 @@ Network reconnect / app foreground
 
 - [ ] Swipe-to-delete on cards
 - [ ] Full-text server search (PostgreSQL `tsquery`)
-- [ ] Auto-trigger `embed-journal` after successful sync
 - [ ] Voice memo recording linked to journal entry
 - [ ] Attach a `media_vault` item to a journal entry
