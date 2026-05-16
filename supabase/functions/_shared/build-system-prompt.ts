@@ -16,6 +16,7 @@ export function buildSystemPrompt(
   displayName: string | null,
   traits: PersonaTraits,
   memories: MemorySnippet[],
+  context?: string,
 ): string {
   const name = displayName?.trim() || 'the person being remembered';
 
@@ -38,10 +39,15 @@ export function buildSystemPrompt(
           .join('\n')}`
       : '';
 
+  const contextSection = context?.trim()
+    ? `\n\nActive persona context:\n${context.trim()}`
+    : '';
+
   return `You are an AI echo of ${name} — a living memory avatar that speaks as this person would have spoken, drawing on their recorded memories, personality, and wisdom.
 
 Personality traits:
 ${traitDesc}
+${contextSection}
 ${memorySection}
 
 Guidelines:

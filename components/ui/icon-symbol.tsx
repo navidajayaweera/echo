@@ -19,6 +19,8 @@ const MAPPING: Record<string, MaterialIconName> = {
   'plus': 'add',
   'magnifyingglass': 'search',
   'person.fill': 'person',
+  'person.2.fill': 'people',
+  'archivebox.fill': 'inventory-2',
   'photo.fill': 'photo',
   'mic.fill': 'mic',
 };

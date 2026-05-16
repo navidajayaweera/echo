@@ -1,0 +1,91 @@
+{
+  "projectId": "2713172289002767391",
+  "projectTitle": "Echoes: AI Memory Preservation",
+  "fetchedAt": "2026-05-16T15:38:12.706Z",
+  "screens": [
+    {
+      "slug": "welcome",
+      "title": "Welcome to Echoes",
+      "id": "8135c78993e34e50b1461b2cc0dcb5a9",
+      "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sX2M2OGM2YzllNGYyYzRmMDg5NTA5YmU0YzI4ZmQyOTVlEgsSBxDAyvK01wsYAZIBIwoKcHJvamVjdF9pZBIVQhMyNzEzMTcyMjg5MDAyNzY3Mzkx&filename=&opi=89354086",
+      "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uhiku56QyQLLvfTPazR6mBiHiy2pLcWeVqKL2CVS8P1SipFRdICn-4qspRyHTELs9FNg1rq-gr4mBCGUAxq9Esp4cZVoJHG7NnIG01Yc8uqhKO46skmYixtUGMPwz5tSl0AybUNyOJ2-Vpe-KX9osdJFHI1p8rBYKxhE5fIKUr3oz69aHuBdDWiXErcr0WQhYrHAA266IMs2fsxNNohgNq_1D6aQ1VoFQNlySNlHTNgn7BukvXUpB3Lfio",
+      "files": {
+        "html": "design/stitch/welcome/screen.html",
+        "screenshot": "design/stitch/welcome/screenshot.png",
+        "metadata": "design/stitch/welcome/metadata.json"
+      }
+    },
+    {
+      "slug": "personas",
+      "title": "Personas",
+      "id": "ea87795b77f94262a9df2d96ba4faaea",
+      "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzQ0N2QxMzk3MTk5NDQwNTc4ZWM0NDU2Y2M0NDEwNDRjEgsSBxDAyvK01wsYAZIBIwoKcHJvamVjdF9pZBIVQhMyNzEzMTcyMjg5MDAyNzY3Mzkx&filename=&opi=89354086",
+      "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uhq62U1ohcVPqK9ZR2COGOjVeTIN1cNEJE-PU4JWSaUP24INbSE_IHdJgc96J47n4q5GuMQOmu33mFMNu-iy3z2vYDtLZyi0fb-mMRrQn6J9hzYKLjCAlEacNYqkm_eizmkRRKoLKYo-dupXmUTEA46kyGNmarF3XgNotvp0T99Pel5DlDsU9BuMDcU03Wxnvyy33oFKgtYN-w5AVrDubz49RVvGQ35sSdysd_UANgy_mXkr0wbFOAL6A",
+      "files": {
+        "html": "design/stitch/personas/screen.html",
+        "screenshot": "design/stitch/personas/screenshot.png",
+        "metadata": "design/stitch/personas/metadata.json"
+      }
+    },
+    {
+      "slug": "new-persona",
+      "title": "New Persona",
+      "id": "fb2ae106ec864818a62cf9f572d4907e",
+      "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzZiOWJmOTE5OWM5NDQ4MjJiNjgxZDMzYWNkYTNiNmQwEgsSBxDAyvK01wsYAZIBIwoKcHJvamVjdF9pZBIVQhMyNzEzMTcyMjg5MDAyNzY3Mzkx&filename=&opi=89354086",
+      "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0ug3PJ5saYKe2Zt7UMwIaGmF67yy3abAa1S-XN66exiDFBEUpV3j-wUgR7Bf3q5ifA1UmKyqJWzy-c59xEDSBGUvsJrleZWntd_NB2tog-lqSpFoTesMuqEutbxPN0etM4LvDFqB1_Sgx0f_XKQXMp_zHZErRQV5cCrAhju7ht7kQLkYNSwRvOQUfB1l9jev1c_4_9-KFgbXZgfOMZ5VnJI7Hub6tEG4kYNnbG2TS8wrLQv6Hf2of4vr1w",
+      "files": {
+        "html": "design/stitch/new-persona/screen.html",
+        "screenshot": "design/stitch/new-persona/screenshot.png",
+        "metadata": "design/stitch/new-persona/metadata.json"
+      }
+    },
+    {
+      "slug": "your-archive",
+      "title": "Your Archive (Dark Mode)",
+      "id": "3b8a1928851c4a62bae8907c86727953",
+      "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzE3OWRmNTkyY2QzMzRmNjdhMmExMmFjMDkwZjY5Y2E2EgsSBxDAyvK01wsYAZIBIwoKcHJvamVjdF9pZBIVQhMyNzEzMTcyMjg5MDAyNzY3Mzkx&filename=&opi=89354086",
+      "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0ujsbWIPTIk70p3U_0s2w14QUFnVdtlnOA2dD5xMjzHMgvmjBEo5-qBH5gW2UJWcgg_W_nX7Dx-oa_yxgGbGwJEgrqZt1s2kMkT-VeKSS8Fw_rkYLrVms5Wa2JLQO47jfNN48cjQ5Pmeloy_eNSkPQef9ajy4K2ce7ihKsmgb5NX9jUdhNuBRZ-FKri1A6aNhIDe2w4nHKDIDcv1Yfh-ga1gV1gOUOD8ZVGeBozbVF_KoYGU-DdXDGavgQs",
+      "files": {
+        "html": "design/stitch/your-archive/screen.html",
+        "screenshot": "design/stitch/your-archive/screenshot.png",
+        "metadata": "design/stitch/your-archive/metadata.json"
+      }
+    },
+    {
+      "slug": "conversation-with-mom",
+      "title": "Conversation with Mom",
+      "id": "852a6d662e3640f7afd64eca4aca0e6e",
+      "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzczNTlhNTQ3ZTVmZjRlMjJhYjRiZmU3MjQ4NzA1ZTY2EgsSBxDAyvK01wsYAZIBIwoKcHJvamVjdF9pZBIVQhMyNzEzMTcyMjg5MDAyNzY3Mzkx&filename=&opi=89354086",
+      "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0ug70QRt6C7mpq5TRzOID3-24Zc5H24px8I_cRhc6BZkN9mo5L7TT8YjFmgm0qpeYOhEW0Ey23hPa8WGTtW_C3zcSwVw0MkvYdEV1x2PaD20QdKV_shnD6uCJ8oeAfuyrkyZXbgHgM8f16JtbZwlLe8lfZm3q-zs5qd1lCLHhCg9BZ2yLyvMt54bD9rP0NU4A5zPuT0V0OnnN9e-hX2FykRI3HNz9qqPjyjytWVzcfXRhaECSHnss0OJX-o",
+      "files": {
+        "html": "design/stitch/conversation-with-mom/screen.html",
+        "screenshot": "design/stitch/conversation-with-mom/screenshot.png",
+        "metadata": "design/stitch/conversation-with-mom/metadata.json"
+      }
+    },
+    {
+      "slug": "the-vault",
+      "title": "The Vault",
+      "id": "73f1ac252b614978a2c774ecaa01f54f",
+      "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzY1NDdmNTBiMmUyNzQ1NDhhNGNjYmRlMTRlY2YzYmE2EgsSBxDAyvK01wsYAZIBIwoKcHJvamVjdF9pZBIVQhMyNzEzMTcyMjg5MDAyNzY3Mzkx&filename=&opi=89354086",
+      "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uh8jZ-kHhvi-1tAQEe9Np6LxAoF_hZo-5SpNgU8nxN3Wz1W4FuW8H3DulaMdyBVNsgc1kSq2qlL1GWb2G_niIkL6HFp4ezY5zgtTqAfZFcA4sXHbQjT_TWpP4D3B-O07l2R3HXy6mjuUSX4gGoztACJ_384jsDb57tOFDuousXnbnbKJnMm_UUft5FumyUHrxZHIyKd70zKqUzq7kg-pcX6QZfhiDtDtUu8jB5zKJxj65M2I2iGzFXeXq8",
+      "files": {
+        "html": "design/stitch/the-vault/screen.html",
+        "screenshot": "design/stitch/the-vault/screenshot.png",
+        "metadata": "design/stitch/the-vault/metadata.json"
+      }
+    },
+    {
+      "slug": "settings",
+      "title": "Settings",
+      "id": "4ffa23fd67cd433db3b0bd4d39bb62e8",
+      "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzNmNWViYjE5N2VjOTQ3MWU4YjhkMTc1OTBlMzEzYWE0EgsSBxDAyvK01wsYAZIBIwoKcHJvamVjdF9pZBIVQhMyNzEzMTcyMjg5MDAyNzY3Mzkx&filename=&opi=89354086",
+      "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uipOivXV7ACAJtxgc1e8TO0KaX6qX_MTAs6AKPKmGu5D9_WqtE4Z-3uygM5njOEWGwE2wZRKb1gxgzHiPjGnQv439PP68hknj6m-jyJLXAs0ZztL3BAOpG_iHy00CZuSnV1qt2I_E7Efy51h_lCnQUy7Ku27sUCUPCBcS_v2oOvialHzx4tnXMiJKl7yjA1VwCXF8MVle-cS5GoLO-lYbleWGfCAaR74YSIGh238dfzsD8o4iDB-kqs6A",
+      "files": {
+        "html": "design/stitch/settings/screen.html",
+        "screenshot": "design/stitch/settings/screenshot.png",
+        "metadata": "design/stitch/settings/metadata.json"
+      }
+    }
+  ]
+}

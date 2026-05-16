@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   filled: {
-    backgroundColor: EchoColors.accent,
+    backgroundColor: EchoColors.primary,
   },
   outline: {
     backgroundColor: 'transparent',
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   labelFilled: {
-    color: EchoColors.bg,
+    color: EchoColors.onPrimary,
   },
   labelOutline: {
     color: EchoColors.text,

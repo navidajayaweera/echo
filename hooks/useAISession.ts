@@ -10,6 +10,8 @@ import type {
   LLMResult,
   StartSessionResult,
 } from '@/lib/types/ai-session';
+import type { Persona } from '@/lib/types/persona';
+import { useSessionStore } from '@/stores/session.store';
 
 const PROVIDER_STORAGE_KEY = 'echo_ai_provider';
 const DEFAULT_PROVIDER: AIProviderName = 'openai';
@@ -35,12 +37,23 @@ type SessionState = IdleState | ConnectingState | LLMActiveState | BPActiveState
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useAISession() {
+function buildPersonaContext(persona: Persona | null): string | undefined {
+  if (!persona) return undefined;
+  return [
+    `You are an AI representation of ${persona.name} (${persona.relationship}).`,
+    persona.description,
+    `Emotional profile: ${persona.emotionalProfile}.`,
+    'Always disclose that you are an AI built from preserved memories, not a living person.',
+  ].join(' ');
+}
+
+export function useAISession(persona: Persona | null = null) {
   const [state, setState] = useState<SessionState>({ status: 'idle' });
   const [provider, setProviderState] = useState<AIProviderName>(DEFAULT_PROVIDER);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const sessionStore = useSessionStore();
 
   // Persist provider preference
   useEffect(() => {
@@ -67,11 +80,14 @@ export function useAISession() {
     abortRef.current?.abort();
     setState({ status: 'connecting' });
     setMessages([]);
+    sessionStore.setConnecting(provider);
 
     try {
       const result: StartSessionResult = await callAISession({
         provider,
         messages: [],
+        context: buildPersonaContext(persona),
+        persona_overrides: persona?.traits,
       });
 
       if (result.provider === 'beyond_presence') {
@@ -82,20 +98,20 @@ export function useAISession() {
           sessionId: bp.sessionId,
           livekit: bp.livekit,
         });
+        sessionStore.setConnected(bp.sessionId, bp.livekit);
       } else {
         const llm = result as LLMResult;
-        // Add the initial greeting as the first assistant message
         const greeting: ChatMessage = { role: 'assistant', content: llm.message };
         setMessages([greeting]);
         setState({ status: 'active', provider: llm.provider, sessionId: llm.sessionId });
+        sessionStore.setConnected(llm.sessionId);
       }
     } catch (err) {
-      setState({
-        status: 'error',
-        message: err instanceof Error ? err.message : 'Connection failed',
-      });
+      const message = err instanceof Error ? err.message : 'Connection failed';
+      setState({ status: 'error', message });
+      sessionStore.setError(message);
     }
-  }, [provider, state.status]);
+  }, [provider, state.status, persona, sessionStore]);
 
   // ── Send a user message (LLM providers only) ──────────────────────────────
 
@@ -114,6 +130,8 @@ export function useAISession() {
         const result = await callAISession({
           provider,
           messages: nextMessages,
+          context: buildPersonaContext(persona),
+          persona_overrides: persona?.traits,
         });
 
         if ('message' in result) {
@@ -133,17 +151,16 @@ export function useAISession() {
         setIsTyping(false);
       }
     },
-    [state, provider, messages],
+    [state, provider, messages, persona],
   );
-
-  // ── End session ───────────────────────────────────────────────────────────
 
   const endSession = useCallback(() => {
     abortRef.current?.abort();
     setState({ status: 'idle' });
     setMessages([]);
     setIsTyping(false);
-  }, []);
+    sessionStore.setDisconnected();
+  }, [sessionStore]);
 
   // ── Derived helpers ───────────────────────────────────────────────────────
 

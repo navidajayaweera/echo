@@ -29,7 +29,7 @@ export function RootNavigator() {
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!session && !inAuthGroup) {
-      router.replace('/login');
+      router.replace('/welcome');
     } else if (session && inAuthGroup) {
       router.replace('/(tabs)');
     }
@@ -40,6 +40,7 @@ export function RootNavigator() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: EchoColors.bg } }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="persona" />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="light" />

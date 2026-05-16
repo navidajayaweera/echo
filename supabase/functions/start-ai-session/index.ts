@@ -96,7 +96,7 @@ Deno.serve(async (req: Request) => {
 
     // 2. Parse body
     const body: StartSessionRequest = await req.json();
-    const { provider: providerName, messages, persona_overrides } = body;
+    const { provider: providerName, messages, persona_overrides, context } = body;
 
     if (!providerName || !(providerName in PROVIDERS)) {
       return json({ error: `Unknown provider "${providerName}". Valid: ${Object.keys(PROVIDERS).join(', ')}` }, 400);
@@ -134,6 +134,7 @@ Deno.serve(async (req: Request) => {
       profile?.display_name ?? null,
       personaTraits,
       memories,
+      context,
     );
 
     // 4. Delegate to provider

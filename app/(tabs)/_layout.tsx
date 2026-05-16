@@ -13,18 +13,18 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: EchoColors.accent,
+        tabBarActiveTintColor: EchoColors.primary,
         tabBarInactiveTintColor: EchoColors.textDim,
         tabBarLabelStyle: styles.tabLabel,
         tabBarIconStyle: styles.tabIcon,
         tabBarStyle: {
-          backgroundColor: EchoColors.bg,
-          borderTopColor: EchoColors.border,
+          backgroundColor: EchoColors.bgLowest,
+          borderTopColor: EchoColors.glassBorder,
           borderTopWidth: StyleSheet.hairlineWidth,
           height: tabBarHeight,
           paddingTop: 8,
           paddingBottom: insets.bottom + 4,
-          paddingHorizontal: 8,
+          paddingHorizontal: 4,
         },
         tabBarItemStyle: {
           paddingVertical: 4,
@@ -40,10 +40,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="journal"
+        name="personas"
         options={{
-          title: 'Journal',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="book.fill" color={color} />,
+          title: 'Personas',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.2.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -54,10 +54,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="timeline"
+        name="vault"
         options={{
-          title: 'Timeline',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="clock.fill" color={color} />,
+          title: 'Vault',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="archivebox.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -67,6 +67,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="gearshape.fill" color={color} />,
         }}
       />
+      <Tabs.Screen name="journal" options={{ href: null }} />
+      <Tabs.Screen name="timeline" options={{ href: null }} />
     </Tabs>
   );
 }

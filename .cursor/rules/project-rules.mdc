@@ -1,0 +1,20 @@
+You are working on Echoes.
+
+Core principles:
+- Emotional-first UX
+- Persona-centric architecture
+- Memory preservation over generic chat
+- Cinematic dark visual language
+- Presence over utility
+
+Never:
+- Break persona-memory relationships
+- Remove AI disclosure in preserved-identity flows
+- Introduce manipulative or dependency-seeking language
+- Reframe Echoes as a generic SaaS assistant
+
+Always:
+- Keep persona selection explicit in key journeys
+- Preserve provider abstraction boundaries
+- Maintain offline-safe memory capture behavior
+- Update docs and decision logs after major architecture changes
